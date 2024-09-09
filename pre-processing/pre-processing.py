@@ -1,0 +1,45 @@
+import pandas as pd
+import json
+
+# Load the CSV file
+input_csv = 'scraped_data.csv'
+output_csv = 'transformed_output.csv'
+
+# Read the data from the CSV into a DataFrame
+df = pd.read_csv(input_csv)
+
+# Initialize a list to collect rows
+rows = []
+
+# Loop through each row in the DataFrame and parse the JSON data
+for i, row in df.iterrows():
+    # Parse each "data" field into a valid JSON object
+    entry = json.loads(row["data"])  # Assuming each 'data' field contains valid JSON
+    if "snippets" in entry["data"]["entities"]:
+        for snippet_id, snippet_data in entry["data"]["entities"]["snippets"].items():
+            for word_data in snippet_data["words"]:
+                row_data = {
+                    "Conversation ID": row,
+                    "Snippet ID": snippet_id,        # Key from entities
+                    "Conversation ID": snippet_data["conversation_id"],
+                    "Audio Start Offset": snippet_data["audio_start_offset"],
+                    "Audio End Offset": snippet_data["audio_end_offset"],
+                    "Speaker ID": snippet_data["speaker_id"],
+                    "Speaker Name": snippet_data["speaker_name"],
+                    "Is Facilitator": snippet_data["is_facilitator"],
+                    "Index in Conversation": snippet_data["index_in_conversation"],
+                    "Word": word_data[0],
+                    "Start": word_data[1],
+                    "End": word_data[2],
+                    "Duration": word_data[3],
+                    "Content": snippet_data["content"],
+                }
+                rows.append(row_data)
+
+# Creating a DataFrame from the rows list
+df_transformed = pd.DataFrame(rows)
+
+# Save the transformed data to a new CSV file
+df_transformed.to_csv(output_csv, index=False)
+
+print(f"Transformation complete. Data saved to {output_csv}")
