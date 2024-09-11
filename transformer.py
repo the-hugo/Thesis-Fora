@@ -28,8 +28,7 @@ def sentiment_analysis(text):
 
 # Function to process a single group (i.e., sentence)
 def process_sentence(group):
-    sentence = group['Content'].iloc[0]
-    
+    sentence = group['Content'].iloc[0] 
     if not isinstance(sentence, str) or sentence.strip() == "":
         return None  # Return None for invalid or empty sentences
 
@@ -62,7 +61,7 @@ sentence_ner = []
 sentence_sentiment = []
 
 def parallel_processing(grouped_data, batch_size=1000, checkpoint_interval=1000):
-    global sentence_features, sentence_ner, sentence_sentiment
+    global data, processed_data  # Ensure that data is treated as a global variable
     
     temp_results = []  # Temporary storage for results
     futures = []
@@ -100,11 +99,13 @@ def parallel_processing(grouped_data, batch_size=1000, checkpoint_interval=1000)
                             'Word_Sentiment': None
                         })
                 
-                # Save checkpoint
+                # Create DataFrame from temp_results
                 temp_df = pd.DataFrame(temp_results)
-                data.update(temp_df.set_index(['Conversation ID', 'Speaker ID', 'Index in Conversation']))
                 
-                # Append to checkpoint data
+                # Merge the temp DataFrame with the main DataFrame on 'Conversation ID', 'Speaker ID', and 'Index in Conversation'
+                data = pd.merge(data, temp_df, on=['Conversation ID', 'Speaker ID', 'Index in Conversation'], how='left', suffixes=('', '_new'))
+
+                # Save the updated DataFrame with checkpoint
                 processed_data = pd.concat([processed_data, temp_df])
                 processed_data.to_csv(checkpoint_path, index=False)
                 print(f"Checkpoint saved at sentence {idx + 1}")
@@ -139,18 +140,17 @@ def parallel_processing(grouped_data, batch_size=1000, checkpoint_interval=1000)
         # Add final batch to data
         if temp_results:
             final_df = pd.DataFrame(temp_results)
-            data.update(final_df.set_index(['Conversation ID', 'Speaker ID', 'Index in Conversation']))
+            
+            # Merge the final batch with the main DataFrame
+            data = pd.merge(data, final_df, on=['Conversation ID', 'Speaker ID', 'Index in Conversation'], how='left', suffixes=('', '_new'))
+            
             processed_data = pd.concat([processed_data, final_df])
             processed_data.to_csv(checkpoint_path, index=False)
             print(f"Final checkpoint saved.")
 
-# Run the parallel processing with checkpointing
 parallel_processing(grouped_data)
 
-# After processing, save the final data
-data['Sentence_Features'] = sentence_features
-data['Sentence_NER'] = sentence_ner
-data['Word_Sentiment'] = [sent['label'] if sent else None for sent in sentence_sentiment]
+data = pd.merge(data, processed_data, on=['Conversation ID', 'Speaker ID', 'Index in Conversation'], how='left', suffixes=('', '_new'))
 
 # Save the final processed dataframe
 final_output_path = "./data/processed_output.csv"
