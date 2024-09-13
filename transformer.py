@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 logging.set_verbosity_error()
 
 # Load the CSV data
-data = pd.read_csv("./data/transformed_output.csv")
+data = pd.read_csv("./data/transformed_output.csv", sep=',')
 
 # Initialize transformers pipelines for different tasks
 extractor = pipeline("feature-extraction", model="bert-base-uncased")
@@ -42,32 +42,33 @@ def process_sentence(group):
         'sentiment': sentiment
     }
 
+data = data.drop_duplicates(subset=['Index in Conversation', 'Content'])
+
 # Group by Conversation ID and Speaker ID, as we need to distinguish between conversations and speakers
 grouped_data = data.groupby(['Conversation ID', 'Speaker ID', 'Index in Conversation'])
 
-# Load checkpointed data if it exists
-checkpoint_path = "./data/checkpoint_output.csv"
-if os.path.exists(checkpoint_path):
-    processed_data = pd.read_csv(checkpoint_path)
-    start_idx = len(processed_data)
-    print(f"Resuming from checkpoint at index {start_idx}")
-else:
-    processed_data = pd.DataFrame(columns=data.columns)
-    start_idx = 0
+# Add new columns to the original data to hold NLP results
+data['Sentence_Features'] = None
+data['Sentence_NER'] = None
+data['Word_Sentiment'] = None
 
-# Create lists to store results
-sentence_features = []
-sentence_ner = []
-sentence_sentiment = []
-
+# Function to handle parallel processing
 def parallel_processing(grouped_data, batch_size=1000, checkpoint_interval=1000):
-    global data, processed_data  # Ensure that data is treated as a global variable
-    
     temp_results = []  # Temporary storage for results
     futures = []
 
+    # Load checkpointed data if it exists
+    checkpoint_path = "./data/checkpoint_output.csv"
+    if os.path.exists(checkpoint_path):
+        processed_data = pd.read_csv(checkpoint_path)
+        start_idx = len(processed_data)
+        print(f"Resuming from checkpoint at index {start_idx}")
+    else:
+        processed_data = pd.DataFrame()  # Initialize as an empty DataFrame if no checkpoint exists
+        start_idx = 0
+
     # Use ThreadPoolExecutor for parallel processing
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:  # Adjust max_workers based on your system
         grouped_data_tqdm = tqdm(enumerate(grouped_data), total=len(grouped_data), desc="Processing Groups")
         for idx, (name, group) in grouped_data_tqdm:
             if idx < start_idx:  # Skip already processed data
@@ -84,35 +85,48 @@ def parallel_processing(grouped_data, batch_size=1000, checkpoint_interval=1000)
                             'Conversation ID': name[0],
                             'Speaker ID': name[1],
                             'Index in Conversation': name[2],
-                            'Sentence_Features': result['features'],
-                            'Sentence_NER': result['ner_results'],
-                            'Word_Sentiment': result['sentiment']['label']
+                            'features': result['features'],
+                            'ner_results': result['ner_results'],
+                            'sentiment': result['sentiment']['label']
                         })
                     else:
+                        print("HI")
                         # Add placeholders for skipped sentences
                         temp_results.append({
                             'Conversation ID': name[0],
                             'Speaker ID': name[1],
                             'Index in Conversation': name[2],
-                            'Sentence_Features': None,
-                            'Sentence_NER': None,
-                            'Word_Sentiment': None
+                            'features': None,
+                            'ner_results': None,
+                            'sentiment': None
                         })
-                
-                # Create DataFrame from temp_results
-                temp_df = pd.DataFrame(temp_results)
-                
-                # Merge the temp DataFrame with the main DataFrame on 'Conversation ID', 'Speaker ID', and 'Index in Conversation'
-                data = pd.merge(data, temp_df, on=['Conversation ID', 'Speaker ID', 'Index in Conversation'], how='left', suffixes=('', '_new'))
+
+                # After processing, directly update the corresponding rows in `data` DataFrame
+                for temp_result in temp_results:
+                    mask = (
+                        (data['Conversation ID'] == temp_result['Conversation ID']) &
+                        (data['Speaker ID'] == temp_result['Speaker ID']) &
+                        (data['Index in Conversation'] == temp_result['Index in Conversation'])
+                    )
+                    
+                    # Use `.at[]` for scalar values to avoid dimension mismatch issues
+                    idx_to_update = data[mask].index
+                    
+                    if len(idx_to_update) == 1:  # Ensure we're updating one row
+                        data.at[idx_to_update[0], 'Sentence_Features'] = temp_result['features']
+                        data.at[idx_to_update[0], 'Sentence_NER'] = temp_result['ner_results']
+                        data.at[idx_to_update[0], 'Word_Sentiment'] = temp_result['sentiment']
+                    else:
+                        print(f"Warning: Multiple rows found for the same index: {temp_result['Index in Conversation']}")
 
                 # Save the updated DataFrame with checkpoint
-                processed_data = pd.concat([processed_data, temp_df])
+                processed_data = pd.concat([processed_data, pd.DataFrame(temp_results)], ignore_index=True)
                 processed_data.to_csv(checkpoint_path, index=False)
                 print(f"Checkpoint saved at sentence {idx + 1}")
                 
                 # Reset for the next batch
                 temp_results = []
-                futures = []  # Reset futures for next batch
+                futures.clear()  # Clear the list of futures
                 
         # Handle any remaining futures
         for future in tqdm(as_completed(futures), total=len(futures), desc="Final Results"):
@@ -122,9 +136,9 @@ def parallel_processing(grouped_data, batch_size=1000, checkpoint_interval=1000)
                     'Conversation ID': name[0],
                     'Speaker ID': name[1],
                     'Index in Conversation': name[2],
-                    'Sentence_Features': result['features'],
-                    'Sentence_NER': result['ner_results'],
-                    'Word_Sentiment': result['sentiment']['label']
+                    'features': result['features'],
+                    'ner_results': result['ner_results'],
+                    'sentiment': result['sentiment']['label']
                 })
             else:
                 # Add placeholders for skipped sentences
@@ -132,27 +146,35 @@ def parallel_processing(grouped_data, batch_size=1000, checkpoint_interval=1000)
                     'Conversation ID': name[0],
                     'Speaker ID': name[1],
                     'Index in Conversation': name[2],
-                    'Sentence_Features': None,
-                    'Sentence_NER': None,
-                    'Word_Sentiment': None
+                    'features': None,
+                    'ner_results': None,
+                    'sentiment': None
                 })
-                
-        # Add final batch to data
-        if temp_results:
-            final_df = pd.DataFrame(temp_results)
-            
-            # Merge the final batch with the main DataFrame
-            data = pd.merge(data, final_df, on=['Conversation ID', 'Speaker ID', 'Index in Conversation'], how='left', suffixes=('', '_new'))
-            
-            processed_data = pd.concat([processed_data, final_df])
-            processed_data.to_csv(checkpoint_path, index=False)
-            print(f"Final checkpoint saved.")
 
+        # Add final batch results directly to the original DataFrame
+        for temp_result in temp_results:
+            mask = (
+                (data['Conversation ID'] == temp_result['Conversation ID']) &
+                (data['Speaker ID'] == temp_result['Speaker ID']) &
+                (data['Index in Conversation'] == temp_result['Index in Conversation'])
+            )
+            
+            idx_to_update = data[mask].index
+            if len(idx_to_update) == 1:  # Ensure we're updating one row
+                data.at[idx_to_update[0], 'Sentence_Features'] = temp_result['features']
+                data.at[idx_to_update[0], 'Sentence_NER'] = temp_result['ner_results']
+                data.at[idx_to_update[0], 'Word_Sentiment'] = temp_result['sentiment']
+
+        # Save the final batch to the checkpoint file
+        processed_data = pd.concat([processed_data, pd.DataFrame(temp_results)], ignore_index=True)
+        processed_data.to_csv(checkpoint_path, index=False)
+        print(f"Final checkpoint saved.")
+
+# Run the parallel processing function
 parallel_processing(grouped_data)
 
-data = pd.merge(data, processed_data, on=['Conversation ID', 'Speaker ID', 'Index in Conversation'], how='left', suffixes=('', '_new'))
-
-# Save the final processed dataframe
+# Save the final output
 final_output_path = "./data/processed_output.csv"
 data.to_csv(final_output_path, index=False)
 print(f"Final output saved to {final_output_path}")
+                             
