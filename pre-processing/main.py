@@ -1,18 +1,17 @@
 import requests
 import json
 import pandas as pd
+import os
 
 # Base URL for the API
 base_url = "https://app.fora.io/api/conversations/detail/{}"
 
-# List of IDs to scrape
-ids = [
-    3146, 3145, 3132, 3144, 3130, 3133, 3129, 3113, 3028, 3112, 3138,
-    3026, 3175, 2971, 3176, 2973, 2778, 2972, 2759, 2711, 2761, 2719,
-    2774, 2684, 3130, 3132, 5547, 5600, 5545, 5544, 3246, 3201, 3203,
-    3202, 3114, 3247, 3136, 3135
-]
-
+base_path = "../data/input"
+collection_path = os.path.join(base_path, "collection-150_Maine")
+ids = []
+for file in os.listdir(collection_path):
+    if file.startswith("conv"):
+        ids.append(file.split("_")[1].split(".")[0])
 
 # Function to scrape data for each ID
 def scrape_data(id_list):
@@ -44,7 +43,7 @@ scraped_data = scrape_data(ids)
 df = pd.DataFrame(scraped_data)
 
 # Save the DataFrame to a CSV file
-csv_file_path = "scraped_data.csv"
+csv_file_path = f"{collection_path}_data.csv"
 df.to_csv(csv_file_path, index=False)
 
 print(f"Data saved to {csv_file_path}")

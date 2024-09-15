@@ -2,8 +2,8 @@ import pandas as pd
 import json
 
 # Load the CSV file
-input_csv = 'scraped_data.csv'
-output_csv = 'transformed_output.csv'
+input_csv = 'C:\\Users\\paul-\\Documents\\Uni\\Management and Digital Technologies\\Thesis Fora\\data\\input\\collection-150_Maine_data.csv'
+output_csv = 'C:\\Users\\paul-\\Documents\\Uni\\Management and Digital Technologies\\Thesis Fora\\data\\input\\collection-150_Maine\\transformed_input.csv'
 
 # Read the data from the CSV into a DataFrame
 df = pd.read_csv(input_csv)
@@ -28,10 +28,8 @@ for i, row in df.iterrows():
                     "Speaker Name": snippet_data["speaker_name"],
                     "Is Facilitator": snippet_data["is_facilitator"],
                     "Index in Conversation": snippet_data["index_in_conversation"],
-                    "Word": word_data[0],
-                    "Start": word_data[1],
-                    "End": word_data[2],
-                    "Duration": word_data[3],
+                    "duration": snippet_data["duration"],
+                    "speaker_gender": snippet_data["speaker_gender"],
                     "Content": snippet_data["content"],
                 }
                 rows.append(row_data)

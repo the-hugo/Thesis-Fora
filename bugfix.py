@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 logging.set_verbosity_error()
 
 # Load the CSV data
-data = pd.read_csv("./data/scraped_sampled.csv", sep=';')
+data = pd.read_csv("./data/processed_sampled_output.csv", sep=',')
 
 # Initialize transformers pipelines for different tasks
 extractor = pipeline("feature-extraction", model="bert-base-uncased")
