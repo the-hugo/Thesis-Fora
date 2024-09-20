@@ -2,8 +2,8 @@ import pandas as pd
 import json
 
 # Load the CSV file
-input_csv = 'C:\\Users\\paul-\\Documents\\Uni\\Management and Digital Technologies\\Thesis Fora\\data\\input\\collection-150_Maine_data.csv'
-output_csv = 'C:\\Users\\paul-\\Documents\\Uni\\Management and Digital Technologies\\Thesis Fora\\data\\input\\collection-150_Maine\\transformed_input.csv'
+input_csv = 'C:\\Users\\paul-\\Documents\\Uni\\Management and Digital Technologies\\Thesis Fora\\data\\input\\collection-150_Maine\\collection-150_Maine_data.csv'
+output_csv = 'C:\\Users\\paul-\\Documents\\Uni\\Management and Digital Technologies\\Thesis Fora\\data\\input\\collection-150_Maine\\collection-150_Maine_transformed_data.csv'
 
 # Read the data from the CSV into a DataFrame
 df = pd.read_csv(input_csv)
@@ -34,8 +34,11 @@ for i, row in df.iterrows():
                 }
                 rows.append(row_data)
 
+
 # Creating a DataFrame from the rows list
 df_transformed = pd.DataFrame(rows)
+# kill all duplicates
+df_transformed.drop_duplicates(inplace=True)
 
 # Save the transformed data to a new CSV file
 df_transformed.to_csv(output_csv, index=False)

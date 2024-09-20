@@ -23,6 +23,7 @@ def scrape_data(id_list):
 
         # If the request was successful, parse the JSON data
         if response.status_code == 200:
+            print("Successfully retrieved data for ID", idx)
             try:
                 data = response.json()  # Convert response to JSON
 

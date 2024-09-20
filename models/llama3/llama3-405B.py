@@ -4,50 +4,47 @@ import pandas as pd
 from tqdm import tqdm
 from transformers import pipeline, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import torch
+from huggingface_hub import login
+import huggingface_hub.utils
 
-# Disable oneDNN optimizations (if needed)
+login("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")
+huggingface_hub.utils._http.default_timeout = 230
 logging.set_verbosity_error()
 
-# Load the CSV data
-data = pd.read_csv("./data/processed_sampled_output.csv", sep=',')
+collection_name = "collection-150_Maine"
+input_path = "/mounts/Users/cisintern/pfromm/{}_transformed_data.csv".format(collection_name)
+data = pd.read_csv(input_path, sep=',')
 
-# Initialize transformers pipelines for different tasks
-extractor = pipeline("feature-extraction", model="bert-base-uncased")
-ner_pipeline = pipeline("ner", model="dbmdz/bert-large-cased-finetuned-conll03-english", aggregation_strategy="simple")
-sentiment_classifier = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+extractor = pipeline("feature-extraction", model="meta-llama/Meta-Llama-3.1-405B")
+ner_pipeline = pipeline("ner", model="meta-llama/Meta-Llama-3.1-405B", aggregation_strategy="simple")
 
-data = data.drop_duplicates(subset=['Audio Start Offset', 'Content'])
-data = data.drop(columns=['Start', 'End', 'Duration'])
-
-# Add new columns to the original data to hold NLP results
-data['Sentence_Features'] = None
+data['CLS_Embedding'] = None
 data['Sentence_NER'] = None
-data['Word_Sentiment'] = None
+data['Sentence_Sentiment'] = None
 
 # Define functions
 def feature_extraction(text):
-    return extractor(text)[0]
+    features = extractor(text)[0]
+    features_tensor = torch.tensor(features)
+    sentence_embedding = features_tensor[0].tolist()
+    return sentence_embedding
 
 def ner(text):
     return ner_pipeline(text)
 
-def sentiment_analysis(text):
-    return sentiment_classifier(text)[0]
-
 # Function to process a single group (i.e., sentence)
-def process_sentence(group):
-    sentence = group['Content']
+def process_sentence(snippet):
+    sentence = snippet['Content']
     if not isinstance(sentence, str) or sentence.strip() == "":
         return None  # Return None for invalid or empty sentences
 
     features = feature_extraction(sentence)
     ner_results = ner(sentence)
-    sentiment = sentiment_analysis(sentence)
     
     return {
         'features': features,
         'ner_results': ner_results,
-        'sentiment': sentiment
     }
 
 # Function to handle parallel processing
@@ -66,15 +63,13 @@ def parallel_processing(grouped_data):
 
         result = process_sentence(row)
         if result:
-            data.at[index, 'Sentence_Features'] = result['features']
+            data.at[index, 'CLS_Embedding'] = result['features']
             data.at[index, 'Sentence_NER'] = result['ner_results']
-            data.at[index, 'Word_Sentiment'] = result['sentiment']['label']
         else:
-            data.at[index, 'Sentence_Features'] = None
+            data.at[index, 'CLS_Embedding'] = None
             data.at[index, 'Sentence_NER'] = None
-            data.at[index, 'Word_Sentiment'] = None
 
-final_output_path = "./data/processed_output.csv"
+final_output_path = "/mounts/Users/cisintern/pfromm/{collection}_llama3_processed_output.csv".format(collection=collection_name)
 parallel_processing(data)
 
 data.to_csv(final_output_path, index=False)
