@@ -1,0 +1,91 @@
+import umap
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+import plotly.express as px
+
+class EmbeddingVisualizer:
+    def __init__(self, model, collection_name, input_path_template, output_path_template):
+        self.model = model
+        self.collection_name = collection_name
+        self.input_path = input_path_template.format(collection_name, model)
+        self.output_path_template = output_path_template
+        self.df = None
+        self.speaker_embeddings = None
+        self.load_data()
+
+    def load_data(self):
+        print(f"Loading data from {self.input_path}")
+        self.df = pd.read_pickle(self.input_path)
+        self.df['Latent-Attention_Embedding'] = self.df['Latent-Attention_Embedding'].apply(np.array)
+        initial_count = len(self.df)
+        self.df = self.df.dropna(subset=['Latent-Attention_Embedding'])
+        dropped_count = initial_count - len(self.df)
+        print(f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'")
+
+    def compute_aggregated_embeddings(self):
+        self.speaker_embeddings = self.df.groupby('Speaker Name')['Latent-Attention_Embedding'].apply(
+            lambda x: np.mean(np.vstack(x), axis=0)).reset_index()
+        speaker_info = self.df[['Speaker Name', 'Is Facilitator']].drop_duplicates()
+        self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='Speaker Name')
+
+    def compute_umap(self, data):
+        scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent-Attention_Embedding'].values))
+        reducer = umap.UMAP(n_components=2, random_state=42)
+        embedding_2d = reducer.fit_transform(scaled_X)
+        return embedding_2d
+
+    def plot_aggregated(self):
+        self.compute_aggregated_embeddings()
+        embedding_2d = self.compute_umap(self.speaker_embeddings)
+        self.speaker_embeddings['UMAP_1'] = embedding_2d[:, 0]
+        self.speaker_embeddings['UMAP_2'] = embedding_2d[:, 1]
+        self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['Is Facilitator'].map(
+            {True: 'Facilitator', False: 'Non-Facilitator'})
+
+        fig = px.scatter(
+            self.speaker_embeddings,
+            x='UMAP_1', 
+            y='UMAP_2',
+            color='Facilitator',
+            title=f'{self.model}: Aggregated Speaker Turn Embeddings for {self.collection_name}',
+            labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
+            hover_name='Speaker Name',
+            color_discrete_map={'Facilitator': 'red', 'Non-Facilitator': 'blue'}
+        )
+        fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
+        fig.write_html(self.output_path_template.format(self.model, self.collection_name, 'collection_aggregated_umap'))
+        print(f"Saved aggregated UMAP plot for {self.collection_name}")
+
+    def plot_by_conversation(self):
+        for conversation_id, group in self.df.groupby('Conversation ID'):
+            embedding_2d = self.compute_umap(group)
+            group['UMAP_1'] = embedding_2d[:, 0]
+            group['UMAP_2'] = embedding_2d[:, 1]
+            group['Facilitator'] = group['Is Facilitator'].map({True: 'Facilitator', False: 'Non-Facilitator'})
+
+            fig = px.scatter(
+                group,
+                x='UMAP_1', 
+                y='UMAP_2',
+                color='Facilitator',
+                title=f'{self.model}: Embedding for Conversation {conversation_id} in {self.collection_name}',
+                labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
+                hover_name='Speaker Name',
+                hover_data={'Index in Conversation': True},
+                color_discrete_map={'Facilitator': 'red', 'Non-Facilitator': 'blue'}
+            )
+            fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
+            fig.write_html(self.output_path_template.format(self.model, self.collection_name, f'conversation_{conversation_id}_umap'))
+            print(f"Saved UMAP plot for Conversation {conversation_id} in {self.collection_name}")
+
+
+# Usage example
+model = "nv-embed"
+collection_name = "collection-150_Maine"
+input_path_template = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\data\output\{}_{}_processed_output.pkl"
+output_path_template = r'C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/data/output/{}_{}_{}.html'
+
+visualizer = EmbeddingVisualizer(model, collection_name, input_path_template, output_path_template)
+visualizer.plot_aggregated()
+visualizer.plot_by_conversation()
