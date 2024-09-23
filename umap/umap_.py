@@ -57,14 +57,14 @@ class EmbeddingVisualizer:
         self.speaker_embeddings['UMAP_2'] = embedding_2d[:, 1]
         self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['Is Facilitator'].map(
             {True: 'Facilitator', False: 'Non-Facilitator'})
-        self.speaker_embeddings['Turn Distribution'] = self.speaker_embeddings.apply(
-            lambda row: px.bar(
-            self.df[self.df['Speaker Name'] == row['Speaker Name']],
-            x='Index in Conversation',
-            y='Snippet ID',
-            title=f"Turn Distribution for {row['Speaker Name']}",
-            labels={'Index in Conversation': 'Index in Conversation', 'Snippet ID': 'Unique Speaker Turns'}
-            ).to_html(full_html=False), axis=1)
+        # self.speaker_embeddings['Turn Distribution'] = self.speaker_embeddings.apply(
+        #     lambda row: px.bar(
+        #     self.df[self.df['Speaker Name'] == row['Speaker Name']],
+        #     x='Index in Conversation',
+        #     y='Snippet ID',
+        #     title=f"Turn Distribution for {row['Speaker Name']}",
+        #     labels={'Index in Conversation': 'Index in Conversation', 'Snippet ID': 'Unique Speaker Turns'}
+        #     ).to_html(full_html=False), axis=1)
 
         self.speaker_embeddings['Index in Conversation'] = self.speaker_embeddings['Index in Conversation'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
         self.speaker_embeddings['Speaker ID'] = self.speaker_embeddings['Speaker ID'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
@@ -80,7 +80,7 @@ class EmbeddingVisualizer:
                         "Average Turn Length": True,
                         "Unique Speaker Turns": True,
                         "Speaker ID": True,
-                        "Turn Distribution": True,
+                        #"Turn Distribution": True,
                             'Facilitator': False,
                             'UMAP_1': False,            
                             'UMAP_2': False},
