@@ -56,7 +56,7 @@ class EmbeddingVisualizer:
         self.speaker_embeddings['UMAP_1'] = embedding_2d[:, 0]
         self.speaker_embeddings['UMAP_2'] = embedding_2d[:, 1]
         self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['Is Facilitator'].map(
-            {True: 'Facilitator', False: 'Non-Facilitator'})
+            {True: 'Facilitator', False: 'Participant'})
         # self.speaker_embeddings['Turn Distribution'] = self.speaker_embeddings.apply(
         #     lambda row: px.bar(
         #     self.df[self.df['Speaker Name'] == row['Speaker Name']],
@@ -84,7 +84,7 @@ class EmbeddingVisualizer:
                             'Facilitator': False,
                             'UMAP_1': False,            
                             'UMAP_2': False},
-            color_discrete_map={'Facilitator': 'red', 'Non-Facilitator': 'blue'}
+            color_discrete_map={'Facilitator': 'red', 'Participant': 'blue'}
         )
         fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
         fig.write_html(self.output_path_template.format(self.model, self.collection_name, 'collection_aggregated_umap'))
