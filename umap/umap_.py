@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import plotly.express as px
+import textwrap
 
 class EmbeddingVisualizer:
     def __init__(self, model, collection_name, input_path_template, output_path_template):
@@ -26,8 +27,22 @@ class EmbeddingVisualizer:
     def compute_aggregated_embeddings(self):
         self.speaker_embeddings = self.df.groupby('Speaker Name')['Latent-Attention_Embedding'].apply(
             lambda x: np.mean(np.vstack(x), axis=0)).reset_index()
-        speaker_info = self.df[['Speaker Name', 'Is Facilitator']].drop_duplicates()
+        speaker_info = self.df[['Is Facilitator', "Speaker Name"]].drop_duplicates()
+        conversation_info = self.df.groupby('Speaker Name').apply(
+            lambda x: {
+            'Index in Conversation': ', '.join(map(str, x['Index in Conversation'].values)),
+            'Snippet ID': ', '.join(map(str, x['Snippet ID'].values)),
+            'Speaker ID': ', '.join(map(str, x['Speaker ID'].unique()))  # Assuming each speaker has a unique ID
+            }).reset_index()
+
+        self.speaker_embeddings['Unique Speaker Turns'] = self.df.groupby('Speaker Name')['Snippet ID'].nunique().values
+        self.speaker_embeddings['Average Turn Length'] = self.df.groupby('Speaker Name')['duration'].mean().values
+        conversation_info[['Index in Conversation', 'Snippet ID', 'Speaker ID']] = pd.DataFrame(
+            conversation_info[0].tolist(), index=conversation_info.index)
+        conversation_info = conversation_info.drop(columns=[0])
+
         self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='Speaker Name')
+        self.speaker_embeddings = pd.merge(self.speaker_embeddings, conversation_info, on='Speaker Name')
 
     def compute_umap(self, data):
         scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent-Attention_Embedding'].values))
@@ -42,15 +57,33 @@ class EmbeddingVisualizer:
         self.speaker_embeddings['UMAP_2'] = embedding_2d[:, 1]
         self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['Is Facilitator'].map(
             {True: 'Facilitator', False: 'Non-Facilitator'})
+        self.speaker_embeddings['Turn Distribution'] = self.speaker_embeddings.apply(
+            lambda row: px.bar(
+            self.df[self.df['Speaker Name'] == row['Speaker Name']],
+            x='Index in Conversation',
+            y='Snippet ID',
+            title=f"Turn Distribution for {row['Speaker Name']}",
+            labels={'Index in Conversation': 'Index in Conversation', 'Snippet ID': 'Unique Speaker Turns'}
+            ).to_html(full_html=False), axis=1)
 
-        fig = px.scatter(
+        self.speaker_embeddings['Index in Conversation'] = self.speaker_embeddings['Index in Conversation'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+        self.speaker_embeddings['Speaker ID'] = self.speaker_embeddings['Speaker ID'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+        fig = px.scatter(   
             self.speaker_embeddings,
             x='UMAP_1', 
             y='UMAP_2',
             color='Facilitator',
             title=f'{self.model}: Aggregated Speaker Turn Embeddings for {self.collection_name}',
-            labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
+            #labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
             hover_name='Speaker Name',
+            hover_data={'Index in Conversation': True,
+                        "Average Turn Length": True,
+                        "Unique Speaker Turns": True,
+                        "Speaker ID": True,
+                        "Turn Distribution": True,
+                            'Facilitator': False,
+                            'UMAP_1': False,            
+                            'UMAP_2': False},
             color_discrete_map={'Facilitator': 'red', 'Non-Facilitator': 'blue'}
         )
         fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
@@ -63,6 +96,8 @@ class EmbeddingVisualizer:
             group['UMAP_1'] = embedding_2d[:, 0]
             group['UMAP_2'] = embedding_2d[:, 1]
             group['Facilitator'] = group['Is Facilitator'].map({True: 'Facilitator', False: 'Non-Facilitator'})
+            group['Wrapped Content'] = group['Content'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+            group['duration'] = group['duration'].astype(int)
 
             fig = px.scatter(
                 group,
@@ -70,9 +105,12 @@ class EmbeddingVisualizer:
                 y='UMAP_2',
                 color='Facilitator',
                 title=f'{self.model}: Embedding for Conversation {conversation_id} in {self.collection_name}',
-                labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
+                #labels={'Words': 'Content', "Duration": "duration"},
                 hover_name='Speaker Name',
-                hover_data={'Index in Conversation': True},
+                hover_data={'Index in Conversation': True, "Wrapped Content": True, "duration": True,
+                            'Facilitator': False,
+                            'UMAP_1': False,            
+                            'UMAP_2': False  },
                 color_discrete_map={'Facilitator': 'red', 'Non-Facilitator': 'blue'}
             )
             fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
