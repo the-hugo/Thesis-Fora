@@ -25,24 +25,57 @@ class EmbeddingVisualizer:
         print(f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'")
 
     def compute_aggregated_embeddings(self):
+
         self.speaker_embeddings = self.df.groupby('Speaker Name')['Latent-Attention_Embedding'].apply(
             lambda x: np.mean(np.vstack(x), axis=0)).reset_index()
+        
+        # Get unique speaker information (is facilitator or not)
         speaker_info = self.df[['Is Facilitator', "Speaker Name"]].drop_duplicates()
+
+        # Compute conversation-related information for each speaker
         conversation_info = self.df.groupby('Speaker Name').apply(
             lambda x: {
-            'Index in Conversation': ', '.join(map(str, x['Index in Conversation'].values)),
-            'Snippet ID': ', '.join(map(str, x['Snippet ID'].values)),
-            'Speaker ID': ', '.join(map(str, x['Speaker ID'].unique()))  # Assuming each speaker has a unique ID
+                'Index in Conversation': ', '.join(map(str, x['Index in Conversation'].values)),
+                'Snippet ID': ', '.join(map(str, x['Snippet ID'].values)),
+                'Speaker ID': ', '.join(map(str, x['Speaker ID'].unique()))  # Assuming each speaker has a unique ID
             }).reset_index()
 
+        # Add the number of unique speaker turns (turn count)
         self.speaker_embeddings['Unique Speaker Turns'] = self.df.groupby('Speaker Name')['Snippet ID'].nunique().values
+        
+        # Add the average turn length (mean of the 'Duration' column for each speaker)
         self.speaker_embeddings['Average Turn Length'] = self.df.groupby('Speaker Name')['duration'].mean().values
+
+        # Normalize 'Index in Conversation' to calculate relative turn position (0 = beginning, 1 = end)
+        self.df['Normalized Turn Position'] = self.df.groupby('Conversation ID')['Index in Conversation'].apply(lambda x: x / x.max())
+
+        # Calculate the average turn position for each speaker (mean of normalized turn positions)
+        self.speaker_embeddings['Average Turn Position'] = self.df.groupby('Speaker Name')['Normalized Turn Position'].mean().values
+
+        # Convert the conversation-related information into separate columns
         conversation_info[['Index in Conversation', 'Snippet ID', 'Speaker ID']] = pd.DataFrame(
             conversation_info[0].tolist(), index=conversation_info.index)
         conversation_info = conversation_info.drop(columns=[0])
 
+        # Merge speaker embeddings with speaker info (facilitator or not) and conversation info
         self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='Speaker Name')
         self.speaker_embeddings = pd.merge(self.speaker_embeddings, conversation_info, on='Speaker Name')
+        
+        # Add intra and inter group comparison for facilitators and participants
+        facilitator_df = self.speaker_embeddings[self.speaker_embeddings['Is Facilitator'] == True]
+        participant_df = self.speaker_embeddings[self.speaker_embeddings['Is Facilitator'] == False]
+
+        # Calculate intra-group averages (facilitators and participants separately)
+        facilitator_metrics = facilitator_df[['Unique Speaker Turns', 'Average Turn Length', 'Average Turn Position']].mean()
+        participant_metrics = participant_df[['Unique Speaker Turns', 'Average Turn Length', 'Average Turn Position']].mean()
+
+        # Calculate differences (inter-group comparison)
+        inter_group_differences = facilitator_metrics - participant_metrics
+        
+        # Store inter-group comparison results
+        self.speaker_embeddings['Facilitator_Participant_Differences'] = inter_group_differences
+
+        return self.speaker_embeddings
 
     def compute_umap(self, data):
         scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent-Attention_Embedding'].values))
@@ -51,42 +84,82 @@ class EmbeddingVisualizer:
         return embedding_2d
 
     def plot_aggregated(self):
+            # Compute the aggregated embeddings
         self.compute_aggregated_embeddings()
+        
+        # Compute UMAP embeddings for visualization
         embedding_2d = self.compute_umap(self.speaker_embeddings)
         self.speaker_embeddings['UMAP_1'] = embedding_2d[:, 0]
         self.speaker_embeddings['UMAP_2'] = embedding_2d[:, 1]
+
+        # Map facilitators and participants for coloring
         self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['Is Facilitator'].map(
             {True: 'Facilitator', False: 'Participant'})
-        # self.speaker_embeddings['Turn Distribution'] = self.speaker_embeddings.apply(
-        #     lambda row: px.bar(
-        #     self.df[self.df['Speaker Name'] == row['Speaker Name']],
-        #     x='Index in Conversation',
-        #     y='Snippet ID',
-        #     title=f"Turn Distribution for {row['Speaker Name']}",
-        #     labels={'Index in Conversation': 'Index in Conversation', 'Snippet ID': 'Unique Speaker Turns'}
-        #     ).to_html(full_html=False), axis=1)
 
-        self.speaker_embeddings['Index in Conversation'] = self.speaker_embeddings['Index in Conversation'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
-        self.speaker_embeddings['Speaker ID'] = self.speaker_embeddings['Speaker ID'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
-        fig = px.scatter(   
+        # Calculate intra-metrics (within facilitators and participants)
+        facilitator_df = self.speaker_embeddings[self.speaker_embeddings['Is Facilitator'] == True]
+        participant_df = self.speaker_embeddings[self.speaker_embeddings['Is Facilitator'] == False]
+
+        # Intra-metrics: Calculate mean values for facilitators and participants separately
+        facilitator_metrics = facilitator_df[['Unique Speaker Turns', 'Average Turn Length', 'Average Turn Position']].mean()
+        participant_metrics = participant_df[['Unique Speaker Turns', 'Average Turn Length', 'Average Turn Position']].mean()
+
+        # Inter-metrics: Calculate the differences between facilitators and participants
+        inter_group_differences = facilitator_metrics - participant_metrics
+
+        # Add the inter and intra metrics into hover information
+        self.speaker_embeddings['Intra Turn Length (Facilitator)'] = facilitator_metrics['Average Turn Length']
+        self.speaker_embeddings['Intra Turn Length (Participant)'] = participant_metrics['Average Turn Length']
+        self.speaker_embeddings['Inter Turn Length Difference'] = inter_group_differences['Average Turn Length']
+        
+        self.speaker_embeddings['Intra Turn Count (Facilitator)'] = facilitator_metrics['Unique Speaker Turns']
+        self.speaker_embeddings['Intra Turn Count (Participant)'] = participant_metrics['Unique Speaker Turns']
+        self.speaker_embeddings['Inter Turn Count Difference'] = inter_group_differences['Unique Speaker Turns']
+        
+        self.speaker_embeddings['Intra Turn Position (Facilitator)'] = facilitator_metrics['Average Turn Position']
+        self.speaker_embeddings['Intra Turn Position (Participant)'] = participant_metrics['Average Turn Position']
+        self.speaker_embeddings['Inter Turn Position Difference'] = inter_group_differences['Average Turn Position']
+
+        # Wrap long text in 'Index in Conversation' and 'Speaker ID' columns for better visualization
+        self.speaker_embeddings['Index in Conversation'] = self.speaker_embeddings['Index in Conversation'].apply(
+            lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+        self.speaker_embeddings['Speaker ID'] = self.speaker_embeddings['Speaker ID'].apply(
+            lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+
+        # Create the scatter plot using UMAP dimensions with updated hover information
+        fig = px.scatter(
             self.speaker_embeddings,
             x='UMAP_1', 
             y='UMAP_2',
-            color='Facilitator',
+            color='Facilitator',  # Color by role (Facilitator/Participant)
             title=f'{self.model}: Aggregated Speaker Turn Embeddings for {self.collection_name}',
-            #labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
             hover_name='Speaker Name',
-            hover_data={'Index in Conversation': True,
-                        "Average Turn Length": True,
-                        "Unique Speaker Turns": True,
-                        "Speaker ID": True,
-                        #"Turn Distribution": True,
-                            'Facilitator': False,
-                            'UMAP_1': False,            
-                            'UMAP_2': False},
+            hover_data={
+                'Index in Conversation': True,
+                "Average Turn Length": True,         # Show average turn length in hover
+                "Unique Speaker Turns": True,        # Show unique speaker turns in hover
+                "Average Turn Position": True,       # Show average turn position in hover
+                "Speaker ID": True,
+                'Intra Turn Length (Facilitator)': True,   # Intra metric for turn length (Facilitator)
+                'Intra Turn Length (Participant)': True,   # Intra metric for turn length (Participant)
+                'Inter Turn Length Difference': True,      # Inter metric for turn length
+                'Intra Turn Count (Facilitator)': True,    # Intra metric for turn count (Facilitator)
+                'Intra Turn Count (Participant)': True,    # Intra metric for turn count (Participant)
+                'Inter Turn Count Difference': True,       # Inter metric for turn count
+                'Intra Turn Position (Facilitator)': True, # Intra metric for turn position (Facilitator)
+                'Intra Turn Position (Participant)': True, # Intra metric for turn position (Participant)
+                'Inter Turn Position Difference': True,    # Inter metric for turn position
+                'Facilitator': False,                      # Facilitate visualization by omitting redundant info
+                'UMAP_1': False,            
+                'UMAP_2': False
+            },
             color_discrete_map={'Facilitator': 'red', 'Participant': 'blue'}
         )
+
+        # Update trace appearance (marker size, border for facilitators)
         fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
+
+        # Save the plot to HTML file
         fig.write_html(self.output_path_template.format(self.model, self.collection_name, 'collection_aggregated_umap'))
         print(f"Saved aggregated UMAP plot for {self.collection_name}")
 
