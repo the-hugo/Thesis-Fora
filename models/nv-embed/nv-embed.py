@@ -8,7 +8,7 @@ import huggingface_hub.utils
 logging.set_verbosity_error()
 
 huggingface_hub.utils._http.default_timeout = 230
-collection_name = "collection-24_UnitedWayDane"
+collection_name = "corpus_data"
 input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\data\input\{}\{}_transformed_data.csv".format(collection_name, collection_name)
 data = pd.read_csv(input_path, sep=',')
 data['Latent-Attention_Embedding'] = None

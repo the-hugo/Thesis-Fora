@@ -9,7 +9,7 @@ import pickle
 logging.set_verbosity_error()
 
 huggingface_hub.utils._http.default_timeout = 230
-collection_name = "collection-24_UnitedWayDane"
+collection_name = "corpus_data"
 input_path = "/mounts/Users/cisintern/pfromm/{}_transformed_data.csv".format(collection_name)
 print(f"Loading data from {input_path}")
 data = pd.read_csv(input_path, sep=',')
@@ -28,7 +28,7 @@ def feature_extraction(sentence):
     return embedding
 
 def process_sentence(snippet):
-    sentence = snippet['Content']
+    sentence = snippet['words']
     if not isinstance(sentence, str) or sentence.strip() == "":
         return None  # Return None for invalid or empty sentences
 
@@ -44,13 +44,13 @@ def parallel_processing(grouped_data):
 
     for index, row in tqdm(grouped_data.iterrows(), total=len(grouped_data)):
         if current_conv is None:
-            current_conv = row['Conversation ID']
-        if current_conv != row['Conversation ID']:
+            current_conv = row['conversation_id']
+        if current_conv != row['conversation_id']:
             print(f"Saved conversation {current_conv}")
             # Save the intermediate data to a pickle file
             with open(final_output_path, 'wb') as f:
                 pickle.dump(data, f)
-            current_conv = row['Conversation ID']
+            current_conv = row['conversation_id']
             print(f"Processing conversation {current_conv}")
 
         result = process_sentence(row)

@@ -158,9 +158,6 @@ class EmbeddingVisualizer:
         """
         auto_corr_matrix = []
 
-        if 'Speaker Name' not in group.columns:
-            raise ValueError("Column 'Speaker Name' does not exist in the DataFrame")
-
         grouped = group.groupby('Speaker Name')
 
         for speaker, speaker_group in grouped:
@@ -299,7 +296,6 @@ class EmbeddingVisualizer:
 
             self.plot_cross_auto_correlation_3d(group, auto_corr_matrix, cross_corr_matrix, threshold)
 
-# Usage example
 model = "nv-embed"
 collection_name = "collection-150_Maine"
 input_path_template = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\data\output\{}_{}_processed_output.pkl"
