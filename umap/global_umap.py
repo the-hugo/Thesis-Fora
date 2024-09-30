@@ -27,55 +27,77 @@ class GlobalEmbeddingVisualizer:
         print(f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'")
 
     def compute_aggregated_embeddings(self):
-        self.speaker_embeddings = self.df.groupby('speaker_name')['Latent-Attention_Embedding'].apply(
-            lambda x: np.mean(np.vstack(x), axis=0)).reset_index()
-        speaker_info = self.df[['is_fac', "speaker_name"]].drop_duplicates()
-        conversation_info = self.df.groupby('speaker_name').apply(
+        # Filter the dataframe to only include rows where 'is_fac' is True
+        self.df = self.df[self.df['is_fac'] == True]
+
+        self.df['speaker_name'] = self.df['speaker_name'].str.lower().str.strip()
+
+        # Group by 'collection_id' and 'speaker_name' and aggregate the embeddings
+        self.speaker_embeddings = self.df.groupby(['collection_id', 'speaker_name']).agg(
+            Latent_Attention_Embedding=('Latent-Attention_Embedding', lambda x: np.mean(np.vstack(x), axis=0)),
+            conversation_count=('conversation_id', 'nunique')
+        ).reset_index()
+
+        # Conversation info aggregated per speaker name and collection_id
+        conversation_info = self.df.groupby(['collection_id', 'speaker_name']).apply(
             lambda x: {
-            'SpeakerTurn': ', '.join(map(str, x['SpeakerTurn'].values)),
-            'id': ', '.join(map(str, x['id'].values)),
+            'collection_title': x['collection_title'].unique()[0],
+            'conversation_id': ', '.join(map(str, x['conversation_id'].unique())),
             'speaker_id': ', '.join(map(str, x['speaker_id'].unique()))  # Assuming each speaker has a unique ID
             }).reset_index()
 
-        conversation_info[['SpeakerTurn', 'id', 'speaker_id']] = pd.DataFrame(
+        conversation_info[["collection_title", "conversation_id", 'speaker_id']] = pd.DataFrame(
         conversation_info[0].tolist(), index=conversation_info.index)
         conversation_info = conversation_info.drop(columns=[0])
-        self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='speaker_name')
-        self.speaker_embeddings = pd.merge(self.speaker_embeddings, conversation_info, on='speaker_name')
+        
+        # Merge aggregated embeddings with speaker and conversation info
+        self.speaker_embeddings.drop_duplicates(subset=['collection_id', 'speaker_name'], inplace=True)
+
 
     def compute_umap(self, data):
-        scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent-Attention_Embedding'].values))
-        reducer = umap.UMAP(n_components=2, random_state=42)
+        scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent_Attention_Embedding'].values))
+        reducer = umap.UMAP(n_components=3, random_state=42)
         embedding_2d = reducer.fit_transform(scaled_X)
         return embedding_2d
 
     def plot_aggregated(self):
         self.compute_aggregated_embeddings()
         embedding_2d = self.compute_umap(self.speaker_embeddings)
+
         self.speaker_embeddings['UMAP_1'] = embedding_2d[:, 0]
         self.speaker_embeddings['UMAP_2'] = embedding_2d[:, 1]
-        self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['is_fac'].map(
-            {True: 'Facilitator', False: 'Participant'})
-        self.speaker_embeddings['SpeakerTurn'] = self.speaker_embeddings['SpeakerTurn'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
-        self.speaker_embeddings['speaker_id'] = self.speaker_embeddings['speaker_id'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
-        fig = px.scatter(   
+        self.speaker_embeddings['UMAP_3'] = embedding_2d[:, 2]
+        #self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['is_fac'].map(
+        #    {True: 'Facilitator', False: 'Participant'})
+
+        custom_color_palette = [
+        '#FF0000', '#00FF00', '#0000FF', '#FFA500', '#800080', 
+        '#FFFF00', '#00FFFF', '#FF00FF', '#808080', '#000000',
+        '#FFC0CB', '#800000', '#808000', '#008000', '#000080',
+        '#FF4500', '#2E8B57', '#4682B4', '#D2691E', '#9ACD32'
+        ]
+
+        fig = px.scatter_3d(   
             self.speaker_embeddings,
             x='UMAP_1', 
             y='UMAP_2',
-            color='Facilitator',
+            z='UMAP_3',
+            color='collection_title',  # Use collection_id for color distinction
             title=f'{self.model}: Aggregated Speaker Turn Embeddings for {self.collection_name}',
-            #labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
             hover_name='speaker_name',
-            hover_data={'SpeakerTurn': True,
+            hover_data={
+                        "collection_title": True,
+                        "conversation_id": True,
                         "speaker_id": True,
-                        #"Turn Distribution": True,
-                            'Facilitator': False,
-                            'UMAP_1': False,            
-                            'UMAP_2': False},
-            color_discrete_map={'Facilitator': 'red', 'Participant': 'blue'}
+                        'UMAP_1': False,
+                        'UMAP_2': False,
+                        'UMAP_3': False},
+            color_discrete_sequence= custom_color_palette # Use a predefined discrete color sequence
         )
-        fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
+
+        fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')))
         fig.write_html(self.output_path_template)
+        fig.show()
         print(f"Saved aggregated UMAP plot for {self.collection_name}")
 
 model = "nv-embed"
