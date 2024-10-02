@@ -51,7 +51,7 @@ class GlobalEmbeddingVisualizer:
         conversation_info = conversation_info.drop(columns=[0])
         
         # Merge aggregated embeddings with speaker and conversation info
-        self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='speaker_name')
+        #self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='speaker_name')
         self.speaker_embeddings = pd.merge(self.speaker_embeddings, conversation_info, on=['collection_id', 'speaker_name'])
         
         # Ensure there are no duplicates for the same speaker name in the same collection
