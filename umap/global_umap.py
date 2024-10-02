@@ -51,11 +51,15 @@ class GlobalEmbeddingVisualizer:
         conversation_info = conversation_info.drop(columns=[0])
         
         # Merge aggregated embeddings with speaker and conversation info
+        self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='speaker_name')
+        self.speaker_embeddings = pd.merge(self.speaker_embeddings, conversation_info, on=['collection_id', 'speaker_name'])
+        
+        # Ensure there are no duplicates for the same speaker name in the same collection
         self.speaker_embeddings.drop_duplicates(subset=['collection_id', 'speaker_name'], inplace=True)
 
 
     def compute_umap(self, data):
-        scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent_Attention_Embedding'].values))
+        scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent-Attention_Embedding'].values))
         reducer = umap.UMAP(n_components=3, random_state=42)
         embedding_2d = reducer.fit_transform(scaled_X)
         return embedding_2d
