@@ -1,0 +1,20 @@
+{
+    "model": "nv-embed",
+    "aggregate_on_collection": "False",
+    "show_only": "all",
+    "collection_name": "corpus_data",
+    "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/data/output/umap/data_nv-embed_processed_output.pkl",
+    "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/data/output/graphs/nv-embed/corpus/global2_umap.html",
+    "custom_color_palette": [
+      "#FF0000", "#00FF00", "#0000FF", "#FFA500", "#800080", "#FFFF00", "#00FFFF", 
+      "#FF00FF", "#808080", "#000000", "#FFC0CB", "#FFFFFF", "#808000", "#008000", 
+      "#FD4520", "#000080", "#140280"
+    ],
+    "umap_params": {
+      "n_components": 3
+    },
+    "scaler": "StandardScaler",
+    "plot_marker_size": 10,
+    "plot_marker_line_width": 2
+  }
+  

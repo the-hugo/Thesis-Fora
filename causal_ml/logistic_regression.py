@@ -1,78 +1,58 @@
-import pandas as pd
-from sklearn.linear_model import LogisticRegression
+from econml.grf import CausalForest
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from causalml.inference.meta import LRSRegressor
-from sklearn.model_selection import cross_val_score
+import numpy as np
+import pandas as pd
 
-# Load your dataset (assuming it's a CSV file, adjust the path accordingly)
-df = pd.read_csv('your_dataset.csv')
+# Load and prepare your dataset
+df = pd.read_pickle(r'C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\data\output\umap\data_nv-embed_processed_output.pkl')
+df = df[df['annotated']].copy()
 
-# 1. Data Preparation
+# Create personal_sharing and facilitation_strategy variables
+df['personal_sharing'] = df[['Personal story', 'Personal experience']].max(axis=1)
+df['facilitation_strategy'] = df[['Express affirmation', 'Specific invitation', 'Provide example', 'Open invitation', 'Make connections', 'Express appreciation', 'Follow up question']].max(axis=1)
+df['total_facilitation_strategies'] = df.groupby('conversation_id')['facilitation_strategy'].transform('sum')
 
-# Create separate dataframes for facilitators and participants
-facilitator_df = df[df['is_facilitator'] == True]  # Only facilitator rows
-participant_df = df[df['is_facilitator'] == False]  # Only participant rows
+# Select participant data
+df_participants = df[df['is_fac'] == False]
 
-# Feature engineering: add turn duration and word count
-df['turn_duration'] = df['audio_end_offset'] - df['audio_start_offset']
-df['word_count'] = df['words'].apply(lambda x: len(str(x).split()))
+# Treatment (total facilitation strategies) and outcome (personal sharing)
+T = df_participants['total_facilitation_strategies'].values.reshape(-1, 1)  # Reshape treatment to 2D
+Y = df_participants['personal_sharing'].values.reshape(-1, 1)  # Reshape outcome to 2D
 
-# 2. Use SpeakerTurn and link the most recent facilitator's strategy to the next participant's turn
+# Covariates (duration, word_count, SpeakerTurn)
+X = df_participants[['duration', 'word_count', 'SpeakerTurn']]
 
-# Sort by conversation_id and SpeakerTurn to ensure proper order of conversation
-df = df.sort_values(by=['conversation_id', 'SpeakerTurn'])
+# Train-test split for cross-validation
+X_train, X_test, T_train, T_test, Y_train, Y_test = train_test_split(X, T, Y, test_size=0.2, random_state=42)
 
-# Forward-fill facilitation strategies within each conversation and only fill when the previous speaker was a facilitator
-df['prev_facilitation_strategy'] = df.groupby('conversation_id')['facilitation_strategy'].ffill()
-df['prev_speaker_is_facilitator'] = df.groupby('conversation_id')['is_facilitator'].shift(1)
+# Reshape the treatment and outcome arrays to ensure they are 2D
+T_train = T_train.reshape(-1, 1)
+T_test = T_test.reshape(-1, 1)
+Y_train = Y_train.reshape(-1, 1)
+Y_test = Y_test.reshape(-1, 1)
 
-# Filter to get rows where the previous speaker was a facilitator and the current speaker is a participant
-df_participants_with_strategy = df[(df['is_facilitator'] == False) & (df['prev_speaker_is_facilitator'] == True)].copy()
+# Initialize the Causal Forest model
+causal_forest = CausalForest()
 
-# Remove any rows where the facilitation strategy wasn't filled
-df_participants_with_strategy = df_participants_with_strategy.dropna(subset=['prev_facilitation_strategy'])
+# Fit the model
+causal_forest.fit(Y_train, T_train, X_train)
 
-# 3. Propensity Score Estimation
+# Estimate the treatment effect for test data
+treatment_effects = causal_forest.effect(X_test)
 
-# Define covariates, treatment, and outcome
-X = df_participants_with_strategy[['turn_duration', 'word_count']]  # Covariates
-treatment = df_participants_with_strategy['prev_facilitation_strategy']  # Treatment from previous facilitator
-personal_sharing = df_participants_with_strategy['personal_sharing']  # Outcome (participant's sharing behavior)
+# Average Treatment Effect (ATE)
+ate_cf = np.mean(treatment_effects)
+print(f"Average Treatment Effect (ATE) using Causal Forest: {ate_cf}")
 
-# Split data into training and testing sets for validation
-X_train, X_test, treatment_train, treatment_test = train_test_split(X, treatment, test_size=0.2, random_state=42)
+# Confidence Interval for the ATE
+lb_cf, ub_cf = causal_forest.effect_interval(X_test)
+print(f"Confidence Interval for ATE using Causal Forest: [{lb_cf.mean()}, {ub_cf.mean()}]")
 
-# Standardize the covariates
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
-# Fit a logistic regression model to estimate propensity scores
-logreg = LogisticRegression()
-logreg.fit(X_train_scaled, treatment_train)
-
-# Add the predicted propensity scores to the DataFrame
-df_participants_with_strategy['propensity_score'] = logreg.predict_proba(X)[:, 1]
-
-# Check the distribution of propensity scores (optional)
-df_participants_with_strategy['propensity_score'].hist()
-
-# 4. Double Machine Learning (DML) Outcome Modeling
-
-# Initialize the LRSRegressor for Double Machine Learning
-lr = LRSRegressor()
-
-# Estimate the Average Treatment Effect (ATE) using Double Machine Learning
-te, lb, ub = lr.estimate_ate(X=X, treatment=treatment, y=personal_sharing)
-
-print(f"Estimated Treatment Effect on Personal Sharing: {te}")
-print(f"95% Confidence Interval: ({lb}, {ub})")
-
-# 5. Validation Using Cross-Validation
-
-# Perform cross-validation to ensure model robustness
-cv_scores = cross_val_score(lr.model_t, X, personal_sharing, cv=5)
-
-print(f"Cross-Validation Scores: {cv_scores}")
-print(f"Mean Cross-Validation Score: {cv_scores.mean()}")
+# Plot the heterogeneous treatment effects
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.scatter(T_test, treatment_effects)
+plt.title('Heterogeneous Treatment Effect of Facilitation Strategies on Personal Sharing')
+plt.xlabel('Total Facilitation Strategies')
+plt.ylabel('Estimated Treatment Effect')
+plt.show()
