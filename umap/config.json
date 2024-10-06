@@ -1,7 +1,8 @@
 {
     "model": "nv-embed",
-    "aggregate_on_collection": "False",
-    "show_only": "all",
+    "aggregate_on_collection": false,
+    "show_only": "facilitator",
+    "aggregate_embeddings": true,
     "collection_name": "corpus_data",
     "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/data/output/umap/data_nv-embed_processed_output.pkl",
     "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/data/output/graphs/nv-embed/corpus/global2_umap.html",
@@ -11,10 +12,17 @@
       "#FD4520", "#000080", "#140280"
     ],
     "umap_params": {
-      "n_components": 3
+      "n_components": 3,
+      "metric": "cosine",
+      "random_state": 42  
     },
     "scaler": "StandardScaler",
     "plot_marker_size": 10,
-    "plot_marker_line_width": 2
+    "plot_marker_line_width": 2,
+
+    "supervised_umap": {
+      "enabled": false,
+      "label_column": "collection_id"
+    }
   }
   
