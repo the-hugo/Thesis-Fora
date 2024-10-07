@@ -76,8 +76,6 @@ class GlobalEmbeddingVisualizer:
 
     def truncate_quartiles(self):
         # group by conversation_id
-        # sort by turn number
-        # truncate turns
         self.df["SpeakerTurn"] = self.df.groupby("conversation_id")["SpeakerTurn"].rank(
             method="dense", ascending=True
         )
