@@ -234,7 +234,7 @@ class GlobalEmbeddingVisualizer:
             title=title,
             hover_name="speaker_name",
             hover_data=hover_data,
-            color_discrete_sequence=px.colors.qualitative.Alphabet,
+            color_discrete_sequence=self.custom_color_palette,
         )
 
         fig.update_traces(
@@ -244,6 +244,14 @@ class GlobalEmbeddingVisualizer:
             )
         )
 
+        fig.update_layout(
+        scene=dict(
+            xaxis=dict(title=None, showticklabels=False),
+            yaxis=dict(title=None, showticklabels=False),
+            zaxis=dict(title=None, showticklabels=False),
+        )
+    )
+        
         fig.update_layout(legend_title_text="Role", legend=dict(itemsizing="constant"))
         neighbors = self.umap_params["n_neighbors"]
         metric = self.umap_params["metric"]
