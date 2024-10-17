@@ -15,6 +15,7 @@ class GlobalEmbeddingVisualizer:
         with open(config_path, "r") as config_file:
             self.config = json.load(config_file)
 
+        self.color_by_role = self.config["color_by_role"]
         self.model = self.config["model"]
         self.collection_name = self.config["collection_name"]
         self.input_path = self.config["input_path_template"]
@@ -203,6 +204,7 @@ class GlobalEmbeddingVisualizer:
 
         embedding_2d = self.compute_umap(self.speaker_embeddings)
 
+        
         self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
         self.speaker_embeddings["UMAP_2"] = embedding_2d[:, 1]
         self.speaker_embeddings["UMAP_3"] = embedding_2d[:, 2]
@@ -220,23 +222,44 @@ class GlobalEmbeddingVisualizer:
             "UMAP_2": False,
             "UMAP_3": False,
         }
-
+        
+        # filter for certain collections, is_fac and speaker_names
+        collections = ['United Way of Dane County', 'Maine ED 2050', 'Engage 2020', 'Cambridge City Manager Selection Project']
+        speakers = ['mathias', 'paula', " ashley", " renee", "amparo", "walter", "brian", "naomie", "adrienne"]
+        self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['collection_title'].isin(collections)]
+        self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['is_fac'] == True]
+        self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['speaker_name'].isin(speakers)]
+        
         df_sorted = self.speaker_embeddings.sort_values(by="collection_title")
         title = f'{self.model}: {"Aggregated" if self.aggregate_embeddings else "Individual"} {self.show_only.title()} Embeddings for {self.collection_name} at {level} Level'
 
+        # Determine the coloring mode based on 'color_by_role' parameter
+        if self.color_by_role == "f_p":
+            # Map True/False in 'is_fac' to "Facilitator" and "Participant"
+            df_sorted['role'] = df_sorted['is_fac'].map({True: "Facilitator", False: "Participant"})
+            color_column = "role"  # Use the mapped 'role' column
+            custom_color_palette = ["#ffc600", "#00a4eb"]  # Colors for Facilitator and Participant
+            legend_title = "Role"
+        else:
+            color_column = "collection_title"
+            custom_color_palette = self.custom_color_palette  # Use the collection palette
+            legend_title = "Collection"
+
+        # Generate the figure with appropriate coloring based on the active mode
         fig = px.scatter_3d(
             df_sorted,
             x="UMAP_1",
             y="UMAP_2",
             z="UMAP_3",
-            color="collection_title",
+            color=color_column,  # Dynamically set the color column
             symbol="symbol",
             title=title,
             hover_name="speaker_name",
             hover_data=hover_data,
-            color_discrete_sequence=self.custom_color_palette,
+            color_discrete_sequence=custom_color_palette,  # Use appropriate color palette
         )
 
+        # Update the marker properties
         fig.update_traces(
             marker=dict(
                 size=self.plot_marker_size,
@@ -244,26 +267,34 @@ class GlobalEmbeddingVisualizer:
             )
         )
 
+        # Remove axis labels and tick markers
         fig.update_layout(
-        scene=dict(
-            xaxis=dict(title=None, showticklabels=False),
-            yaxis=dict(title=None, showticklabels=False),
-            zaxis=dict(title=None, showticklabels=False),
+            scene=dict(
+                xaxis=dict(title=None, showticklabels=False),
+                yaxis=dict(title=None, showticklabels=False),
+                zaxis=dict(title=None, showticklabels=False),
+            )
         )
-    )
-        
-        fig.update_layout(legend_title_text="Role", legend=dict(itemsizing="constant"))
+
+        # Update the legend title based on the coloring mode
+        fig.update_layout(
+            legend_title_text=legend_title, 
+            legend=dict(itemsizing="constant")
+        )
+
+        # Extract UMAP parameters
         neighbors = self.umap_params["n_neighbors"]
         metric = self.umap_params["metric"]
 
+        # Add annotations for UMAP parameters and settings
         fig.update_layout(
             annotations=[
                 dict(
                     text=f"Neighbors: {neighbors}<br>"
-                    f"Metric: {metric}<br>"
-                    f"Truncate Turns: {self.truncate_turns}<br>"
-                    f"Supervised: {self.supervised_umap_enabled}<br>"
-                    f"Label: {self.supervised_umap_label_column}",
+                        f"Metric: {metric}<br>"
+                        f"Truncate Turns: {self.truncate_turns}<br>"
+                        f"Supervised: {self.supervised_umap_enabled}<br>"
+                        f"Label: {self.supervised_umap_label_column}",
                     x=0,  # Center the subheading
                     y=1,  # Slightly below the main title
                     xref="paper",
@@ -274,6 +305,8 @@ class GlobalEmbeddingVisualizer:
                 )
             ]
         )
+
+        
         fig.write_html(self.output_path_template)
         fig.show()
         print(

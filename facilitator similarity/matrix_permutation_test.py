@@ -128,7 +128,7 @@ class FacilitatorSimilarity:
             fig = go.Figure(data=[heatmap], layout=layout)
             fig.show()
 
-input_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/data/output/umap/data_nv-embed_processed_output.pkl"
+input_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/umap/data_nv-embed_processed_output.pkl"
 group_columns = ['collection_id', 'conversation_id', 'speaker_name', 'is_fac']
 similarity_calculator = FacilitatorSimilarity(input_path, group_columns)
 similarity_calculator.load_data()

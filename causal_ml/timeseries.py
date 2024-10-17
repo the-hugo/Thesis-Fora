@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.io as pio
 
-df = pd.read_pickle(r'C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\data\output\umap\data_nv-embed_processed_output.pkl')
+df = pd.read_pickle(r'C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\code\data\output\umap\data_nv-embed_processed_output.pkl')
 df = df[df['annotated']].copy()
 
 df['conversation_duration'] = df.groupby('conversation_id')['audio_end_offset'].transform('max') - df.groupby('conversation_id')['audio_start_offset'].transform('min')
