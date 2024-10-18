@@ -223,13 +223,14 @@ class GlobalEmbeddingVisualizer:
             "UMAP_3": False,
         }
         
+        """
         # filter for certain collections, is_fac and speaker_names
         collections = ['United Way of Dane County', 'Maine ED 2050', 'Engage 2020', 'Cambridge City Manager Selection Project']
         speakers = ['mathias', 'paula', " ashley", " renee", "amparo", "walter", "brian", "naomie", "adrienne"]
         self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['collection_title'].isin(collections)]
         self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['is_fac'] == True]
         self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['speaker_name'].isin(speakers)]
-        
+        """
         df_sorted = self.speaker_embeddings.sort_values(by="collection_title")
         title = f'{self.model}: {"Aggregated" if self.aggregate_embeddings else "Individual"} {self.show_only.title()} Embeddings for {self.collection_name} at {level} Level'
 

@@ -1,332 +1,143 @@
 import umap
-import json
-import os
-import numpy as np
 import pandas as pd
-import textwrap
-import plotly.express as px
+import numpy as np
 from sklearn.preprocessing import StandardScaler
-from scipy.spatial import ConvexHull
-import plotly.graph_objects as go
+import plotly.express as px
+import textwrap
 
-class GlobalEmbeddingVisualizer:
-    def __init__(self, config_path):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(script_dir, config_path)
-        with open(config_path, "r") as config_file:
-            self.config = json.load(config_file)
-
-        self.color_by_role = self.config["color_by_role"]
-        self.model = self.config["model"]
-        self.collection_name = self.config["collection_name"]
-        self.input_path = self.config["input_path_template"]
-        self.output_path_template = self.config["output_path_template"]
-        self.custom_color_palette = self.config["custom_color_palette"]
-        self.umap_params = self.config["umap_params"]
-        self.scaler = self.config["scaler"]
-        self.plot_marker_size = self.config["plot_marker_size"]
-        self.plot_marker_line_width = self.config["plot_marker_line_width"]
-        self.show_only = self.config["show_only"]
-        self.aggregate_on_collection = self.config["aggregate_on_collection"]
-        self.aggregate_embeddings = self.config["aggregate_embeddings"]
-        self.supervised_umap_enabled = self.config["supervised_umap"]["enabled"]
-        self.supervised_umap_label_column = self.config["supervised_umap"][
-            "label_column"
-        ]
-        self.truncate_turns = self.config["truncate_turns"]
-
+class EmbeddingVisualizer:
+    def __init__(self, model, collection_name, input_path_template, output_path_template):
+        self.model = model
+        self.collection_name = collection_name
+        self.input_path = input_path_template
+        self.output_path_template = output_path_template
         self.df = None
         self.speaker_embeddings = None
-        self.convo_info = None
         self.load_data()
 
     def load_data(self):
         print(f"Loading data from {self.input_path}")
         self.df = pd.read_pickle(self.input_path)
-        self.df["Latent-Attention_Embedding"] = self.df[
-            "Latent-Attention_Embedding"
-        ].apply(np.array)
-        self.df.rename(
-            columns={"Latent-Attention_Embedding": "Latent_Attention_Embedding"},
-            inplace=True,
-        )
+        self.df['Latent-Attention_Embedding'] = self.df['Latent-Attention_Embedding'].apply(np.array)
         initial_count = len(self.df)
-        self.df = self.df.dropna(subset=["Latent_Attention_Embedding"])
+        self.df = self.df.dropna(subset=['Latent-Attention_Embedding'])
         dropped_count = initial_count - len(self.df)
-        print(
-            f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'"
-        )
-
-    def compute_umap(self, data):
-        scaled_X = StandardScaler().fit_transform(
-            np.vstack(data["Latent_Attention_Embedding"].values)
-        )
-
-        if self.supervised_umap_enabled:
-            labels = data[self.supervised_umap_label_column].values
-            print(
-                f"Using supervised UMAP with label column: {self.supervised_umap_label_column}"
-            )
-            reducer = umap.UMAP(**self.umap_params, target_metric="categorical")
-            embedding_2d = reducer.fit_transform(scaled_X, y=labels)
-        else:
-            print("Using unsupervised UMAP")
-            reducer = umap.UMAP(**self.umap_params)
-            embedding_2d = reducer.fit_transform(scaled_X)
-
-        return embedding_2d
-
-    def truncate_quartiles(self):
-        # group by conversation_id
-        self.df["SpeakerTurn"] = self.df.groupby("conversation_id")["SpeakerTurn"].rank(
-            method="dense", ascending=True
-        )
-        # cut off the first quartile and the last quartile
-        self.df = self.df[
-            (self.df["SpeakerTurn"] > self.df["SpeakerTurn"].quantile(0.40))
-            & (self.df["SpeakerTurn"] < self.df["SpeakerTurn"].quantile(0.60))
-        ]
-
-    def create_conversation_info(self, group_columns):
-        if self.aggregate_on_collection:
-            conversation_info_columns = [
-                "collection_title",
-                "symbol",
-                "is_fac",
-                "conversation_ids",
-                "speaker_id",
-                "speaker_name",
-            ]
-            conversation_info = (
-                self.df.groupby(group_columns)
-                .apply(
-                    lambda x: {
-                        "collection_title": x["collection_title"].unique()[0],
-                        "symbol": x["symbol"].unique()[0],
-                        "is_fac": x["is_fac"].unique()[0],
-                        "conversation_ids": ", ".join(
-                            map(str, x["conversation_id"].unique())
-                        ),
-                        "speaker_id": ", ".join(map(str, x["speaker_id"].unique())),
-                        "speaker_name": ", ".join(map(str, x["speaker_name"].unique())),
-                    }
-                )
-                .reset_index()
-            )
-        else:
-            conversation_info_columns = [
-                "collection_title",
-                "symbol",
-                "is_fac",
-                "speaker_id",
-                "speaker_name",
-            ]
-            conversation_info = (
-                self.df.groupby(group_columns)
-                .apply(
-                    lambda x: {
-                        "collection_title": x["collection_title"].unique()[0],
-                        "symbol": x["symbol"].unique()[0],
-                        "is_fac": x["is_fac"].unique()[0],
-                        "speaker_id": ", ".join(map(str, x["speaker_id"].unique())),
-                        "speaker_name": ", ".join(map(str, x["speaker_name"].unique())),
-                    }
-                )
-                .reset_index()
-            )
-        # self.speaker_embeddings["conversation_id"] = self.speaker_embeddings["conversation_id"].astype(str)
-        conversation_info[conversation_info_columns] = pd.DataFrame(
-            conversation_info[0].tolist(), index=conversation_info.index
-        )
-        conversation_info = conversation_info.drop(columns=[0])
-        self.convo_info = {col: True for col in conversation_info_columns}
-        return conversation_info
+        print(f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'")
 
     def compute_aggregated_embeddings(self):
-        self.df["speaker_name"] = self.df["speaker_name"].str.lower().str.strip()
-        self.df = self.df[
-            ~self.df["speaker_name"].str.contains(
-                "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
-            )
-        ]
+        self.speaker_embeddings = self.df.groupby('speaker_name')['Latent-Attention_Embedding'].apply(
+            lambda x: np.mean(np.vstack(x), axis=0)).reset_index()
+        speaker_info = self.df[['is_fac', "speaker_name"]].drop_duplicates()
+        conversation_info = self.df.groupby('speaker_name').apply(
+            lambda x: {
+            'Index in Conversation': ', '.join(map(str, x['SpeakerTurn'].values)),
+            #'Snippet ID': ', '.join(map(str, x['Snippet ID'].values)),
+            'Speaker ID': ', '.join(map(str, x['speaker_id'].unique()))  # Assuming each speaker has a unique ID
+            }).reset_index()
 
-        self.df["symbol"] = self.df["is_fac"].apply(
-            lambda is_fac: "triangle-up" if is_fac else "circle"
-        )
+        # self.speaker_embeddings['Unique Speaker Turns'] = self.df.groupby('Speaker Name')['Snippet ID'].nunique().values
+        # self.speaker_embeddings['Average Turn Length'] = self.df.groupby('Speaker Name')['duration'].mean().values
+        conversation_info[['Index in Conversation', 'Speaker ID']] = pd.DataFrame(
+        conversation_info[0].tolist(), index=conversation_info.index)
+        conversation_info = conversation_info.drop(columns=[0])
 
-        if self.truncate_turns:
-            self.truncate_quartiles()
+        self.speaker_embeddings = pd.merge(self.speaker_embeddings, speaker_info, on='speaker_name')
+        self.speaker_embeddings = pd.merge(self.speaker_embeddings, conversation_info, on='speaker_name')
 
-        if self.show_only == "facilitators":
-            self.df = self.df[self.df["is_fac"] == True]
-
-        elif self.show_only == "participants":
-            self.df = self.df[self.df["is_fac"] == False]
-
-        if self.aggregate_embeddings:
-            if self.aggregate_on_collection:
-                print("Aggregating on collection level")
-                group_columns = [
-                    "collection_id",
-                    "speaker_name",
-                ]
-                conversation_info = self.create_conversation_info(group_columns)
-            else:
-                print("Aggregating on conversation level")
-                group_columns = ["conversation_id", "speaker_name"]
-                conversation_info = self.create_conversation_info(group_columns)
-
-            self.speaker_embeddings = (
-                self.df.groupby(group_columns)
-                .agg(
-                    Latent_Attention_Embedding=(
-                        "Latent_Attention_Embedding",
-                        lambda x: np.mean(x, axis=0),
-                    ),
-                )
-                .reset_index()
-            )
-
-        else:
-            print("Embedding each point without aggregation")
-            self.speaker_embeddings = self.df.copy()
-            self.speaker_embeddings["Wrapped_Content"] = self.speaker_embeddings[
-                "words"
-            ].apply(lambda x: "<br>".join(textwrap.wrap(x, width=50)))
-            self.convo_info = {"Wrapped_Content": True, "SpeakerTurn": True}
-            
-        if self.aggregate_embeddings:
-            self.speaker_embeddings = pd.merge(
-                self.speaker_embeddings, conversation_info, on=group_columns
-            )
-
-
+    def compute_umap(self, data):
+        scaled_X = StandardScaler().fit_transform(np.vstack(data['Latent-Attention_Embedding'].values))
+        reducer = umap.UMAP(n_components=2, random_state=42)
+        embedding_2d = reducer.fit_transform(scaled_X)
+        return embedding_2d
 
     def plot_aggregated(self):
         self.compute_aggregated_embeddings()
-
         embedding_2d = self.compute_umap(self.speaker_embeddings)
+        self.speaker_embeddings['UMAP_1'] = embedding_2d[:, 0]
+        self.speaker_embeddings['UMAP_2'] = embedding_2d[:, 1]
+        self.speaker_embeddings['Facilitator'] = self.speaker_embeddings['is_fac'].map(
+            {True: 'Facilitator', False: 'Participant'})
+        
+        # self.speaker_embeddings['Turn Distribution'] = self.speaker_embeddings.apply(
+        #     lambda row: px.bar(
+        #     self.df[self.df['Speaker Name'] == row['Speaker Name']],
+        #     x='Index in Conversation',
+        #     y='Snippet ID',
+        #     title=f"Turn Distribution for {row['Speaker Name']}",
+        #     labels={'Index in Conversation': 'Index in Conversation', 'Snippet ID': 'Unique Speaker Turns'}
+        #     ).to_html(full_html=False), axis=1)
 
-        self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
-        self.speaker_embeddings["UMAP_2"] = embedding_2d[:, 1]
-        self.speaker_embeddings["UMAP_3"] = embedding_2d[:, 2]
-
-        print(self.speaker_embeddings[["is_fac", "symbol"]].head())
-
-        if self.aggregate_embeddings:
-            level = "Collection" if self.aggregate_on_collection else "Conversation"
-        else:
-            level = "SpeakerTurn"
-
-        hover_data = {
-            **self.convo_info,
-            "UMAP_1": False,
-            "UMAP_2": False,
-            "UMAP_3": False,
-        }
-
-        df_sorted = self.speaker_embeddings.sort_values(by="collection_title")
-        title = f'{self.model}: {"Aggregated" if self.aggregate_embeddings else "Individual"} {self.show_only.title()} Embeddings for {self.collection_name} at {level} Level'
-
-        # Determine the coloring mode based on 'color_by_role' parameter
-        if self.color_by_role == "f_p":
-            # Map True/False in 'is_fac' to "Facilitator" and "Participant"
-            df_sorted['role'] = df_sorted['is_fac'].map({True: "Facilitator", False: "Participant"})
-            color_column = "role"  # Use the mapped 'role' column
-            custom_color_palette = ["#ffc600", "#00a4eb"]  # Colors for Facilitator and Participant
-            legend_title = "Role"
-        else:
-            color_column = "collection_title"
-            custom_color_palette = self.custom_color_palette  # Use the collection palette
-            legend_title = "Collection"
-
-        # Generate the scatter plot with appropriate coloring based on the active mode
-        fig = px.scatter_3d(
-            df_sorted,
-            x="UMAP_1",
-            y="UMAP_2",
-            z="UMAP_3",
-            color=color_column,
-            symbol="symbol",
-            title=title,
-            hover_name="speaker_name",
-            hover_data=hover_data,
-            color_discrete_sequence=custom_color_palette,
+        self.speaker_embeddings['Index in Conversation'] = self.speaker_embeddings['SpeakerTurn'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+        self.speaker_embeddings['Speaker ID'] = self.speaker_embeddings['speaker_id'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+        fig = px.scatter(   
+            self.speaker_embeddings,
+            x='UMAP_1', 
+            y='UMAP_2',
+            color='Facilitator',
+            title=f'{self.model}: Aggregated Speaker Turn Embeddings for {self.collection_name}',
+            #labels={'UMAP_1': 'UMAP Dimension 1', 'UMAP_2': 'UMAP Dimension 2'},
+            hover_name='Speaker Name',
+            hover_data={'Index in Conversation': True,
+                        #"Average Turn Length": True,
+                        #"Unique Speaker Turns": True,
+                        "Speaker ID": True,
+                        #"Turn Distribution": True,
+                            'Facilitator': False,
+                            'UMAP_1': False,            
+                            'UMAP_2': False},
+            color_discrete_map={'Facilitator': 'red', 'Participant': 'blue'}
         )
+        fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
+        fig.write_html(self.output_path_template.format(self.model, self.collection_name, 'collection_aggregated_umap'))
+        print(f"Saved aggregated UMAP plot for {self.collection_name}")
 
-        # Update the marker properties
-        fig.update_traces(
-            marker=dict(
-                size=self.plot_marker_size,
-                line=dict(width=self.plot_marker_line_width, color="black"),
+    def plot_by_conversation(self):
+        collections = ['United Way of Dane County']
+        speakers = ['Mathias']
+        
+        # Filter conversation_ids that include the specified speakers
+        conversation_ids_with_speakers = self.df[self.df['speaker_name'].isin(speakers)]['conversation_id'].unique()
+        
+        # Filter conversation_ids that are part of the specified collections
+        conversation_ids_in_collections = self.df[self.df['collection_title'].isin(collections)]['conversation_id'].unique()
+        
+        # Keep rows where conversation_id is in both filtered lists
+        valid_conversation_ids = np.intersect1d(conversation_ids_with_speakers, conversation_ids_in_collections)
+        self.df = self.df[self.df['conversation_id'].isin(valid_conversation_ids)]
+        for conversation_id, group in self.df.groupby('conversation_id'):
+            embedding_2d = self.compute_umap(group)
+            group['UMAP_1'] = embedding_2d[:, 0]
+            group['UMAP_2'] = embedding_2d[:, 1]
+            group['Facilitator'] = group['is_fac'].map({True: 'Facilitator', False: 'Non-Facilitator'})
+            group['Wrapped Content'] = group['words'].apply(lambda x: '<br>'.join(textwrap.wrap(x, width=50)))
+            group['duration'] = group['duration'].astype(int)
+            
+            fig = px.scatter(
+                group,
+                x='UMAP_1', 
+                y='UMAP_2',
+                color='Facilitator',
+                title=f'{self.model}: Embedding for Conversation {conversation_id} in {self.collection_name}',
+                #labels={'Words': 'Content', "Duration": "duration"},
+                hover_name='speaker_name',
+                hover_data={'SpeakerTurn': True, "Wrapped Content": True, "duration": True,
+                            'Facilitator': False,
+                            'UMAP_1': False,            
+                            'UMAP_2': False  },
+                color_discrete_map={'Facilitator': "#ffc600", 'Non-Facilitator': "#00a4eb"}
             )
-        )
-
-        # Remove axis labels and tick markers
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(title=None, showticklabels=False),
-                yaxis=dict(title=None, showticklabels=False),
-                zaxis=dict(title=None, showticklabels=False),
-            )
-        )
-
-        # Compute the convex hull for the overall data
-        overall_points = df_sorted[['UMAP_1', 'UMAP_2', 'UMAP_3']].values
-        if len(overall_points) >= 4:  # ConvexHull requires at least 4 points in 3D
-            overall_hull = ConvexHull(overall_points)
-            overall_hull_trace = go.Mesh3d(
-                x=overall_points[:, 0],
-                y=overall_points[:, 1],
-                z=overall_points[:, 2],
-                i=overall_hull.simplices[:, 0],
-                j=overall_hull.simplices[:, 1],
-                k=overall_hull.simplices[:, 2],
-                opacity=0.2,
-                color='rgba(255, 0, 0, 0.2)',  # Overall convex hull color
-                name='Overall Convex Hull',
-                showscale=False
-            )
-            fig.add_trace(overall_hull_trace)
-
-        # Update the legend title based on the coloring mode
-        fig.update_layout(
-            legend_title_text=legend_title, 
-            legend=dict(itemsizing="constant")
-        )
-
-        # Extract UMAP parameters
-        neighbors = self.umap_params["n_neighbors"]
-        metric = self.umap_params["metric"]
-
-        # Add annotations for UMAP parameters and settings
-        fig.update_layout(
-            annotations=[
-                dict(
-                    text=f"Neighbors: {neighbors}<br>"
-                        f"Metric: {metric}<br>"
-                        f"Truncate Turns: {self.truncate_turns}<br>"
-                        f"Supervised: {self.supervised_umap_enabled}<br>"
-                        f"Label: {self.supervised_umap_label_column}",
-                    x=0,
-                    y=1,
-                    xref="paper",
-                    yref="paper",
-                    showarrow=False,
-                    font=dict(size=8),
-                    align="center",
-                )
-            ]
-        )
-
-        fig.write_html(self.output_path_template)
-        fig.show()
-        print(
-            f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
-        )
+            fig.update_traces(marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(name='Facilitator'))
+            fig.write_html(self.output_path_template.format(self.model, self.collection_name, f'conversation_{conversation_id}_umap'))
+            fig.show()
+            print(f"Saved UMAP plot for Conversation {conversation_id} in {self.collection_name}")
 
 
-# Usage
-config_path = "./config.json"
-visualizer = GlobalEmbeddingVisualizer(config_path)
-visualizer.plot_aggregated()
+# Usage example
+model = "nv-embed"
+collection_name = "collection-150_Maine"
+input_path_template = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/umap/data_nv-embed_processed_output.pkl"
+output_path_template = r'C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\graphs\nv-embed\corpus.html'
+formatted_input_path = input_path_template.format(collection_name, model)
+visualizer = EmbeddingVisualizer(model, collection_name, formatted_input_path, output_path_template)
+#visualizer.plot_aggregated()
+visualizer.plot_by_conversation()
