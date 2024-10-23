@@ -154,7 +154,6 @@ class GlobalEmbeddingVisualizer:
             )
         ]
 
-        # assign labels to the roles
         symbols = {"Facilitator": "diamond", "Participant": "circle"}
         self.df['role'] = self.df['is_fac'].map({True: "Facilitator", False: "Participant"})
         self.df["symbol"] = self.df['role'].map(symbols)
@@ -199,7 +198,7 @@ class GlobalEmbeddingVisualizer:
             self.speaker_embeddings["Wrapped_Content"] = self.speaker_embeddings[
                 "words"
             ].apply(lambda x: "<br>".join(textwrap.wrap(x, width=50)))
-            self.convo_info = {"Wrapped_Content": True, "SpeakerTurn": True, "conversation_id": True}
+            self.convo_info = {"Wrapped_Content": True, "SpeakerTurn": True}
             
         if self.aggregate_embeddings:
             self.speaker_embeddings = pd.merge(
@@ -244,13 +243,12 @@ class GlobalEmbeddingVisualizer:
             color_column = "role"  # Use the mapped 'role' column
             custom_color_palette = ["#ffc600", "#00a4eb"]  # Colors for Facilitator and Participant
             legend_title = "Role"
+            df_sorted = self.speaker_embeddings.sort_values(by="symbol")
         else:
             color_column = "collection_title"
             custom_color_palette = self.custom_color_palette  # Use the collection palette
             legend_title = "Collection"
-
-        # fix for how plotly assigns labels to the legend
-        df_sorted = self.speaker_embeddings.sort_values(by=["symbol", "collection_title"])
+            df_sorted = self.speaker_embeddings.sort_values(by="collection_title")
 
         # Generate the figure with appropriate coloring based on the active mode
         fig = px.scatter_3d(
