@@ -155,7 +155,7 @@ class GlobalEmbeddingVisualizer:
         ]
 
         # assign labels to the roles
-        symbols = {"Facilitator": "diamond", "Participant": "circle"}
+        symbols = {"Facilitator": "square", "Participant": "circle"}
         self.df['role'] = self.df['is_fac'].map({True: "Facilitator", False: "Participant"})
         self.df["symbol"] = self.df['role'].map(symbols)
 
