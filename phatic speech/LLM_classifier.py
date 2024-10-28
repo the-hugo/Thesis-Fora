@@ -20,13 +20,13 @@ def load_data(input_path):
 
 def classify_text_llama(model, tokenizer, text, device='cuda'):
     inputs = tokenizer(
-        f"Task: Analyze the given text snippet and classify each sentence as phatic or non-phatic."
-        "Calculate the phaticity score as a continuous value between 0 and 1."
-        "Snippet: {text}"
-        "Phatic Sentences Count: x"
-        "Non-Phatic Sentences Count: y"
-        "Total Sentences: x + y = z"
-        "Phatic Ratio Calculation: x / z",
+        f"Task: Analyze the given text snippet and classify each sentence as phatic or non-phatic.\n"
+        "Calculate the phaticity score as a continuous value between 0 and 1.\n"
+        "Snippet: {text}\n"
+        "Phatic Sentences Count: x\n"
+        "Non-Phatic Sentences Count: y\n"
+        "Total Sentences: x + y = z\n"
+        "Phatic Ratio Calculation: x / z\n",
         return_tensors="pt",
     ).to(device)
     
