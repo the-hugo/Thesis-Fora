@@ -14,7 +14,7 @@ def load_data(input_path):
     return df
 
 
-def classify_text_llama_batch(model, tokenizer, texts, device="cuda", batch_size=64):
+def classify_text_llama_batch(model, tokenizer, texts, device="cuda"):
     batched_inputs = tokenizer(
         [
             f"Task: Analyze the given text snippet and classify each sentence as phatic or non-phatic.\n"
@@ -49,14 +49,13 @@ def classify_text_llama_batch(model, tokenizer, texts, device="cuda", batch_size
     return phatic_ratios
 
 
-def add_phatic_classification(df, model, tokenizer, batch_size=64):
+def add_phatic_classification(df, model, tokenizer, batch_size=16):
     total_rows = len(df)
     for start_idx in tqdm(range(0, total_rows, batch_size)):
         end_idx = min(start_idx + batch_size, total_rows)
         texts = df.loc[start_idx:end_idx, "words"].tolist()
         
         phatic_results = classify_text_llama_batch(model, tokenizer, texts)
-        
         df.loc[start_idx:end_idx, "phatic speech"] = phatic_results
 
         if start_idx % (batch_size * 100) == 0 and start_idx != 0:
