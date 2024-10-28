@@ -1,9 +1,5 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import pandas as pd
-import numpy as np
-import json
-import os
 from huggingface_hub import login
 from unsloth import FastLanguageModel
 from tqdm import tqdm
