@@ -5,8 +5,10 @@ import numpy as np
 import json
 import os
 from huggingface_hub import login
+from unsloth import FastLanguageModel
 
-login("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")
+token = "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"
+login(token)
 
 
 def load_data(input_path):
@@ -50,7 +52,14 @@ def add_phatic_classification(df, model, tokenizer):
 input_path = "/mounts/Users/cisintern/pfromm/data_nv-embed_processed_output.pkl"
 output_path = "/mounts/Users/cisintern/pfromm/data_llama70B_processed_output.pkl"
 
+load_in_4bit = True
 model_name = "unsloth/Llama-3.1-Nemotron-70B-Instruct-bnb-4bit"
+
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = model_name,
+    load_in_4bit = load_in_4bit,
+    token = token)
+
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
