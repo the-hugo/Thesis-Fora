@@ -1,9 +1,5 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import pandas as pd
-import numpy as np
-import json
-import os
 from huggingface_hub import login
 from unsloth import FastLanguageModel
 from tqdm import tqdm
@@ -18,7 +14,7 @@ def load_data(input_path):
     return df
 
 
-def classify_text_llama(model, tokenizer, text, device='cuda'):
+def classify_text_llama(model, tokenizer, text, device="cuda"):
     inputs = tokenizer(
         f"Task: Analyze the given text snippet and classify each sentence as phatic or non-phatic.\n"
         "Calculate the phaticity score as a continuous value between 0 and 1.\n"
@@ -29,14 +25,14 @@ def classify_text_llama(model, tokenizer, text, device='cuda'):
         "Phatic Ratio Calculation: x / z\n",
         return_tensors="pt",
     ).to(device)
-    
+
     model = model.to(device)
-    
+
     with torch.no_grad():
         outputs = model.generate(**inputs, max_new_tokens=1000)
 
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
+
     ratio_prefix = "Phatic Ratio Calculation"
     if ratio_prefix in response:
         answer = response.split(ratio_prefix)[-1].strip()
@@ -45,15 +41,18 @@ def classify_text_llama(model, tokenizer, text, device='cuda'):
     else:
         return "Ratio not found in response"
 
+
 def add_phatic_classification(df, model, tokenizer):
     for i in tqdm(range(len(df))):
-        df.at[i, "phatic speech"] = classify_text_llama(model, tokenizer, df.at[i, "words"])
-        
+        df.at[i, "phatic speech"] = classify_text_llama(
+            model, tokenizer, df.at[i, "words"]
+        )
+
         if i % 1000 == 0 and i != 0:
             temp_output_path = f"{output_path}_temp_{i}.pkl"
             df.to_pickle(temp_output_path)
             print(f"Temporary DataFrame saved to {temp_output_path}")
-    
+
     return df
 
 
