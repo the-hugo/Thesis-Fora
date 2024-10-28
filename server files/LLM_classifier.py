@@ -32,7 +32,7 @@ def classify_text_llama_batch(model, tokenizer, texts, device="cuda", batch_size
     ).to(device)
 
     with torch.no_grad():
-        outputs = model.generate(**batched_inputs, max_new_tokens=1000)
+        outputs = model.generate(**batched_inputs)
 
     responses = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
@@ -41,6 +41,7 @@ def classify_text_llama_batch(model, tokenizer, texts, device="cuda", batch_size
     for response in responses:
         if ratio_prefix in response:
             answer = response.split(ratio_prefix)[-1].strip()
+            print(answer)
             phatic_ratios.append(answer)
         else:
             phatic_ratios.append("Ratio not found in response")
