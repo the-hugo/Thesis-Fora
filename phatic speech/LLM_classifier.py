@@ -5,18 +5,17 @@ import numpy as np
 import json
 import os
 from huggingface_hub import login
+from unsloth import FastLanguageModel
 
-login("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")
+token = "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"
+login(token)
+
 
 def load_data(input_path):
     print(f"Loading data from {input_path}")
     df = pd.read_pickle(input_path)
-    df['Latent-Attention_Embedding'] = df['Latent-Attention_Embedding'].apply(np.array)
-    initial_count = len(df)
-    df = df.dropna(subset=['Latent-Attention_Embedding'])
-    dropped_count = initial_count - len(df)
-    print(f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'")
     return df
+
 
 def classify_text_llama(model, tokenizer, text):
     inputs = tokenizer(
@@ -34,7 +33,7 @@ def classify_text_llama(model, tokenizer, text):
 
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
     # print(response)
-    ratio_prefix = "Phatic Ratio Calculation: "
+    ratio_prefix = "Phatic Ratio Calculation "
     if ratio_prefix in response:
         answer = response.split(ratio_prefix)[-1].strip()
         print(answer)
@@ -42,29 +41,28 @@ def classify_text_llama(model, tokenizer, text):
     else:
         return "Ratio not found in response"
 
+
 def add_phatic_classification(df, model, tokenizer):
     df["phatic speech"] = df["words"].apply(
         lambda text: classify_text_llama(model, tokenizer, text)
     )
     return df
 
-# Load configuration
-config_path = "./config.json"
-script_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(script_dir, config_path)
 
-with open(config_path, "r") as config_file:
-    config = json.load(config_file)
+input_path = "/mounts/Users/cisintern/pfromm/data_nv-embed_processed_output.pkl"
+output_path = "/mounts/Users/cisintern/pfromm/data_llama70B_processed_output.pkl"
 
-input_path = config["input_path_template"]
-output_path = config["output_path_template"]
+load_in_4bit = True
+model_name = "unsloth/Llama-3.1-Nemotron-70B-Instruct-bnb-4bit"
 
-# Load model and tokenizer
-model_name = "meta-llama/Llama-3.1-8B"
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = model_name,
+    load_in_4bit = load_in_4bit,
+    token = token)
+
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
-# Load data
 df = load_data(input_path)
 
 df = add_phatic_classification(df, model, tokenizer)
