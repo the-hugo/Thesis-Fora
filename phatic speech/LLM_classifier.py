@@ -37,7 +37,7 @@ def classify_text_llama(model, tokenizer, text, device='cuda'):
 
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
     
-    ratio_prefix = "Phatic Ratio Calculation "
+    ratio_prefix = "Phatic Ratio Calculation"
     if ratio_prefix in response:
         answer = response.split(ratio_prefix)[-1].strip()
         print(answer)
