@@ -1,0 +1,6 @@
+{
+  "model": "nv-embed",
+  "hf_token:": "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",
+  "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/embeddings/data_nv-embed_processed_output.pkl",
+  "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/annotated/data_llama405B_processed_output.pkl"
+}

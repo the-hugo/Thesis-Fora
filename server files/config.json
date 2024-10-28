@@ -5,8 +5,8 @@
   "aggregate_embeddings": false,
   "truncate_turns": false,
   "collection_name": "corpus_data",
-  "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/embeddings/data_nv-embed_processed_output.pkl",
-  "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/graphs/nv-embed/corpus/",
+  "input_path_template": "/content/drive/MyDrive/Colab Notebooks/data_nv-embed_processed_output.pkl",
+  "output_path_template": "/content/drive/MyDrive/Colab Notebooks/graphs/",
   "custom_color_palette": [
     "rgb(170, 13, 254)", "rgb(50, 131, 254)", "rgb(133, 102, 13)", "rgb(120, 42, 182)", 
     "rgb(86, 86, 86)", "rgb(28, 131, 86)", "rgb(22, 255, 50)", "rgb(247, 225, 160)", 

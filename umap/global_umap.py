@@ -39,7 +39,6 @@ class GlobalEmbeddingVisualizer:
         self.convo_info = None
         self.load_data()
 
-
     def load_data(self):
         print(f"Loading data from {self.input_path}")
         self.df = pd.read_pickle(self.input_path)
@@ -56,7 +55,6 @@ class GlobalEmbeddingVisualizer:
         print(
             f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'"
         )
-
 
     def compute_umap(self, data):
         scaled_X = StandardScaler().fit_transform(
@@ -77,7 +75,6 @@ class GlobalEmbeddingVisualizer:
 
         return embedding_2d
 
-
     def truncate_quartiles(self):
         # group by conversation_id
         self.df["SpeakerTurn"] = self.df.groupby("conversation_id")["SpeakerTurn"].rank(
@@ -88,7 +85,6 @@ class GlobalEmbeddingVisualizer:
             (self.df["SpeakerTurn"] > self.df["SpeakerTurn"].quantile(0.40))
             & (self.df["SpeakerTurn"] < self.df["SpeakerTurn"].quantile(0.60))
         ]
-
 
     def create_conversation_info(self, group_columns):
         if self.aggregate_on_collection:
@@ -145,7 +141,6 @@ class GlobalEmbeddingVisualizer:
         self.convo_info = {col: True for col in conversation_info_columns}
         return conversation_info
 
-
     def compute_aggregated_embeddings(self):
         self.df["speaker_name"] = self.df["speaker_name"].str.lower().str.strip()
         self.df = self.df[
@@ -156,9 +151,10 @@ class GlobalEmbeddingVisualizer:
 
         # assign labels to the roles
         symbols = {"Facilitator": "square", "Participant": "circle"}
-        self.df['role'] = self.df['is_fac'].map({True: "Facilitator", False: "Participant"})
-        self.df["symbol"] = self.df['role'].map(symbols)
-
+        self.df["role"] = self.df["is_fac"].map(
+            {True: "Facilitator", False: "Participant"}
+        )
+        self.df["symbol"] = self.df["role"].map(symbols)
 
         if self.truncate_turns:
             self.truncate_quartiles()
@@ -199,19 +195,22 @@ class GlobalEmbeddingVisualizer:
             self.speaker_embeddings["Wrapped_Content"] = self.speaker_embeddings[
                 "words"
             ].apply(lambda x: "<br>".join(textwrap.wrap(x, width=50)))
-            self.convo_info = {"Wrapped_Content": True, "SpeakerTurn": True, "conversation_id": True}
-            
+            self.convo_info = {
+                "Wrapped_Content": True,
+                "SpeakerTurn": True,
+                "conversation_id": True,
+            }
+
         if self.aggregate_embeddings:
             self.speaker_embeddings = pd.merge(
                 self.speaker_embeddings, conversation_info, on=group_columns
             )
 
-
     def plot_aggregated(self):
         self.compute_aggregated_embeddings()
 
         embedding_2d = self.compute_umap(self.speaker_embeddings)
-        
+
         self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
         self.speaker_embeddings["UMAP_2"] = embedding_2d[:, 1]
         self.speaker_embeddings["UMAP_3"] = embedding_2d[:, 2]
@@ -227,7 +226,7 @@ class GlobalEmbeddingVisualizer:
             "UMAP_2": False,
             "UMAP_3": False,
         }
-        
+
         """
         # filter for certain collections, is_fac and speaker_names
         collections = ['United Way of Dane County', 'Maine ED 2050', 'Engage 2020', 'Cambridge City Manager Selection Project']
@@ -236,21 +235,28 @@ class GlobalEmbeddingVisualizer:
         self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['is_fac'] == True]
         self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['speaker_name'].isin(speakers)]
         """
-        
+
         title = f'{self.model}: {"Aggregated" if self.aggregate_embeddings else "Individual"} {self.show_only.title()} Embeddings for {self.collection_name} at {level} Level'
 
         # Determine the coloring mode based on 'color_by_role' parameter
         if self.color_by_role == "f_p":
             color_column = "role"  # Use the mapped 'role' column
-            custom_color_palette = ["#ffc600", "#00a4eb"]  # Colors for Facilitator and Participant
+            custom_color_palette = [
+                "#ffc600",
+                "#00a4eb",
+            ]  # Colors for Facilitator and Participant
             legend_title = "Role"
         else:
             color_column = "collection_title"
-            custom_color_palette = self.custom_color_palette  # Use the collection palette
+            custom_color_palette = (
+                self.custom_color_palette
+            )  # Use the collection palette
             legend_title = "Collection"
 
         # fix for how plotly assigns labels to the legend
-        df_sorted = self.speaker_embeddings.sort_values(by=["symbol", "collection_title"])
+        df_sorted = self.speaker_embeddings.sort_values(
+            by=["symbol", "collection_title"]
+        )
 
         # Generate the figure with appropriate coloring based on the active mode
         fig = px.scatter_3d(
@@ -285,8 +291,7 @@ class GlobalEmbeddingVisualizer:
 
         # Update the legend title based on the coloring mode
         fig.update_layout(
-            legend_title_text=legend_title, 
-            legend=dict(itemsizing="constant")
+            legend_title_text=legend_title, legend=dict(itemsizing="constant")
         )
 
         # Extract UMAP parameters
@@ -298,10 +303,10 @@ class GlobalEmbeddingVisualizer:
             annotations=[
                 dict(
                     text=f"Neighbors: {neighbors}<br>"
-                        f"Metric: {metric}<br>"
-                        f"Truncate Turns: {self.truncate_turns}<br>"
-                        f"Supervised: {self.supervised_umap_enabled}<br>"
-                        f"Label: {self.supervised_umap_label_column}",
+                    f"Metric: {metric}<br>"
+                    f"Truncate Turns: {self.truncate_turns}<br>"
+                    f"Supervised: {self.supervised_umap_enabled}<br>"
+                    f"Label: {self.supervised_umap_label_column}",
                     x=0,  # Center the subheading
                     y=1,  # Slightly below the main title
                     xref="paper",
@@ -314,8 +319,18 @@ class GlobalEmbeddingVisualizer:
         )
 
         neighbors = str(self.umap_params["n_neighbors"])
-        
-        final_output_path = self.output_path_template+"umap_embeddings"+"_"+level+"_"+self.show_only+"_"+neighbors+".html"
+
+        final_output_path = (
+            self.output_path_template
+            + "umap_embeddings"
+            + "_"
+            + level
+            + "_"
+            + self.show_only
+            + "_"
+            + neighbors
+            + ".html"
+        )
         fig.write_html(final_output_path)
         fig.show()
         print(
