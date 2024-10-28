@@ -67,9 +67,6 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=model_name, load_in_4bit=load_in_4bit, token=token
 )
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
-
 df = load_data(input_path)
 
 df = add_phatic_classification(df, model, tokenizer)

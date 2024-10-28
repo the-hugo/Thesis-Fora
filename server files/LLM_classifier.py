@@ -6,6 +6,7 @@ import json
 import os
 from huggingface_hub import login
 from unsloth import FastLanguageModel
+from tqdm import tqdm
 
 token = "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"
 login(token)
@@ -17,23 +18,26 @@ def load_data(input_path):
     return df
 
 
-def classify_text_llama(model, tokenizer, text):
+def classify_text_llama(model, tokenizer, text, device="cuda"):
     inputs = tokenizer(
-        f"Task: Analyze the given text snippet and classify each sentence as phatic or non-phatic."
-        "Calculate the phaticity score as a continuous value between 0 and 1."
-        "Snippet: {text}"
-        "Phatic Sentences Count: x"
-        "Non-Phatic Sentences Count: y"
-        "Total Sentences: x + y = z"
-        "Phatic Ratio Calculation: x / z",
+        f"Task: Analyze the given text snippet and classify each sentence as phatic or non-phatic.\n"
+        "Calculate the phaticity score as a continuous value between 0 and 1.\n"
+        "Snippet: {text}\n"
+        "Phatic Sentences Count: x\n"
+        "Non-Phatic Sentences Count: y\n"
+        "Total Sentences: x + y = z\n"
+        "Phatic Ratio Calculation: x / z\n",
         return_tensors="pt",
-    )
+    ).to(device)
+
+    model = model.to(device)
+
     with torch.no_grad():
         outputs = model.generate(**inputs, max_new_tokens=1000)
 
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    # print(response)
-    ratio_prefix = "Phatic Ratio Calculation "
+
+    ratio_prefix = "Phatic Ratio Calculation"
     if ratio_prefix in response:
         answer = response.split(ratio_prefix)[-1].strip()
         print(answer)
@@ -43,9 +47,16 @@ def classify_text_llama(model, tokenizer, text):
 
 
 def add_phatic_classification(df, model, tokenizer):
-    df["phatic speech"] = df["words"].apply(
-        lambda text: classify_text_llama(model, tokenizer, text)
-    )
+    for i in tqdm(range(len(df))):
+        df.at[i, "phatic speech"] = classify_text_llama(
+            model, tokenizer, df.at[i, "words"]
+        )
+
+        if i % 1000 == 0 and i != 0:
+            temp_output_path = f"{output_path}_temp_{i}.pkl"
+            df.to_pickle(temp_output_path)
+            print(f"Temporary DataFrame saved to {temp_output_path}")
+
     return df
 
 
@@ -56,12 +67,8 @@ load_in_4bit = True
 model_name = "unsloth/Llama-3.1-Nemotron-70B-Instruct-bnb-4bit"
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = model_name,
-    load_in_4bit = load_in_4bit,
-    token = token)
-
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+    model_name=model_name, load_in_4bit=load_in_4bit, token=token
+)
 
 df = load_data(input_path)
 
