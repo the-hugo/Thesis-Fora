@@ -56,9 +56,8 @@ load_in_4bit = True
 model_name = "unsloth/Llama-3.1-Nemotron-70B-Instruct-bnb-4bit"
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = model_name,
-    load_in_4bit = load_in_4bit,
-    token = token)
+    model_name=model_name, load_in_4bit=load_in_4bit, token=token
+)
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
