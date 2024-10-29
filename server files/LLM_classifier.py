@@ -1,18 +1,25 @@
 import torch
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "5,6"
+
 import pandas as pd
 from huggingface_hub import login
-from unsloth import FastLanguageModel
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 
 token = "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"
 login(token)
-
 
 def load_data(input_path):
     print(f"Loading data from {input_path}")
     df = pd.read_pickle(input_path)
     return df
 
+model_name = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+model = AutoModelForCausalLM.from_pretrained(
+    model_name, torch_dtype=torch.bfloat16, device_map="auto"
+)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 def classify_text_llama_batch(model, tokenizer, texts, device="cuda"):
     batched_inputs = tokenizer(
@@ -32,7 +39,12 @@ def classify_text_llama_batch(model, tokenizer, texts, device="cuda"):
     ).to(device)
 
     with torch.no_grad():
-        outputs = model.generate(**batched_inputs)
+        outputs = model.generate(
+            batched_inputs['input_ids'].cuda(),
+            attention_mask=batched_inputs['attention_mask'].cuda(),
+            max_new_tokens=4096,
+            pad_token_id=tokenizer.eos_token_id
+        )
 
     responses = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
@@ -47,7 +59,6 @@ def classify_text_llama_batch(model, tokenizer, texts, device="cuda"):
             phatic_ratios.append("Ratio not found in response")
     
     return phatic_ratios
-
 
 def add_phatic_classification(df, model, tokenizer, batch_size=16):
     total_rows = len(df)
@@ -65,21 +76,11 @@ def add_phatic_classification(df, model, tokenizer, batch_size=16):
 
     return df
 
-
 input_path = "/mounts/Users/cisintern/pfromm/data_nv-embed_processed_output.pkl"
 output_path = "/mounts/Users/cisintern/pfromm/data_llama70B_processed_output.pkl"
 
-load_in_4bit = True
-model_name = "unsloth/Llama-3.1-Nemotron-70B-Instruct-bnb-4bit"
-
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name=model_name, load_in_4bit=load_in_4bit, token=token
-)
-
-model = model.to("cuda")
 df = load_data(input_path)
 
 df = add_phatic_classification(df, model, tokenizer)
-
 df.to_pickle(output_path)
 print(f"Final DataFrame saved to {output_path}")
