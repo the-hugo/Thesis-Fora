@@ -15,13 +15,17 @@ if __name__ == "__main__":
     df = load_data(input_path)
     df = df.dropna(subset=["Latent-Attention_Embedding"])
     
+    # kill all rows in df that have less than 30 characters in df["words"]
+    df = df[df["words"].apply(lambda x: len(x) > 40)]
+    
+    # set text to words
     df["text"] = df["words"]
     embeddings = np.vstack(df["Latent-Attention_Embedding"].values)
     
     print(type(df["text"]))
     print(type(embeddings))
     
-    sca = SCA(alpha_decomposition=0.1, mu=0.9, combine_overlap_threshold=0.5)
+    sca = SCA(alpha_decomposition=0.1, mu=0.9, combine_overlap_threshold=-1)
     scores, residuals, ids = sca.fit(df, embeddings)
 
     # get representations and explainable transformations
