@@ -12,7 +12,8 @@ if __name__ == "__main__":
     df = load_data(input_path)
     print("Data loaded")
     
-    pattern = r"(.{0,40})(\d+\.\d+)"
+    # Adjust the pattern to include 0 or 1 as valid floats
+    pattern = r"(.{0,40})(\d+\.\d+|0|1)"
     extracted_values = df["phatic speech"].str.extractall(pattern)
 
     # Combine preceding text and float value for context
@@ -33,12 +34,10 @@ if __name__ == "__main__":
         return None
 
     # Apply the selection function to each row of the original index
-    df["phaticity ratio"] = (
-        filtered_values.groupby(level=0).apply(select_preferred_match).reset_index(drop=True)
-    )
+    phaticity_ratio = filtered_values.groupby(level=0).apply(select_preferred_match)
 
-    # Fill NaN with empty strings for rows without matches
-    df["phaticity ratio"] = df["phaticity ratio"].fillna("")
+    # Ensure alignment by reindexing to the original DataFrame
+    df["phaticity ratio"] = phaticity_ratio.reindex(df.index).fillna("")
 
     print(df["phaticity score"])
     print("Phatic speech extracted")
