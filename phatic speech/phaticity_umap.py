@@ -42,6 +42,10 @@ class GlobalEmbeddingVisualizer:
     def load_data(self):
         print(f"Loading data from {self.input_path}")
         self.df = pd.read_pickle(self.input_path)
+        # check if the column name is not Latent-Attention_Embedding
+        if "Latent-Attention_Embedding" not in self.df.columns:
+            # rename the column to Latent-Attention_Embedding
+            self.df.rename(columns={"Latent_Attention_Embedding": "Latent-Attention_Embedding"}, inplace=True)
         self.df["Latent-Attention_Embedding"] = self.df[
             "Latent-Attention_Embedding"
         ].apply(np.array)
@@ -209,7 +213,15 @@ class GlobalEmbeddingVisualizer:
 
     def plot_aggregated(self):
         # remove all rows that have NaN in phaticity ratio
+        
+        initial_count = len(self.df)
         self.df = self.df.dropna(subset=["phaticity ratio"])
+        dropped_count = initial_count - len(self.df)
+        print(f"Dropped {dropped_count} rows due to NaN values in 'phaticity ratio'")
+        
+        # set a threshold. everything above 0.5 is rounded to 1, everything below is rounded to 0
+        self.df["phaticity ratio"] = self.df["phaticity ratio"].apply(lambda x: 1 if x >= 0.5 else 0)
+        
         self.compute_aggregated_embeddings()
         embedding_2d = self.compute_umap(self.speaker_embeddings)
 

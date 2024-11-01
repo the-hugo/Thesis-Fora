@@ -97,7 +97,7 @@ def plot_histogram(df):
 
 
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\data_llama70B_processed_output.pkl_temp_7200.pkl"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\output_filled_phatic_ratio.pkl"
     print("Loading data")
     df = load_data(input_path)
     print("Data loaded")
@@ -112,5 +112,5 @@ if __name__ == "__main__":
     plot_histogram(df)
     
     # save as pickle and csv
-    df.to_pickle(input_path.replace(".pkl", "_phatic_ratio.pkl"))
+    # df.to_pickle(input_path.replace(".pkl", "_phatic_ratio.pkl"))
     df.to_csv(input_path.replace(".pkl", "_phatic_ratio.csv"))

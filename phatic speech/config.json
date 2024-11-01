@@ -5,7 +5,7 @@
   "aggregate_embeddings": false,
   "truncate_turns": false,
   "collection_name": "corpus_data",
-  "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/annotated/data_llama70B_processed_output_phatic_ratio.pkl_temp_7200_phatic_ratio.pkl",
+  "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/annotated/output_filled_phatic_ratio.pkl",
   "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/graphs/nv-embed/corpus/",
   "custom_color_palette": [
     "rgb(170, 13, 254)", "rgb(50, 131, 254)", "rgb(133, 102, 13)", "rgb(120, 42, 182)", 
