@@ -54,6 +54,9 @@ def match_pattern(df):
         extracted_values[0].astype(float) / extracted_values[1].astype(float)
     ).round(2)
 
+    # kill all rows that contain nan in phaticity ratio and print how many rows were killed
+    print(f"Killed {df['phaticity ratio'].isna().sum()} rows with NaN in phaticity ratio")
+    #df = df.dropna(subset=["phaticity ratio"])
     print("Done")
     return df
 
@@ -74,28 +77,62 @@ def plot_histogram(df):
     )
     
     df["normalized_time"] = df["normalized_time"].round().astype(int)
-    
+    df["phaticity ratio"] = df["phaticity ratio"].apply(lambda x: 1 if x >= 0.5 else 0)
     phaticity_df = df.groupby("normalized_time").agg(
-        phaticity_ratio_sum=("phaticity ratio", "sum"),
-        turn_count=("conversation_id", "count")
+        phaticity_ratio_1_count=("phaticity ratio", lambda x: (x == 1).sum()),
+        phaticity_ratio_all_count=("phaticity ratio", "count"),
     ).reset_index()
-    phaticity_df["average_phaticity_ratio"] = phaticity_df["phaticity_ratio_sum"] / phaticity_df["turn_count"]
+
+    phaticity_df['phaticity_ratio'] = phaticity_df['phaticity_ratio_1_count'] / phaticity_df['phaticity_ratio_all_count']
+    # convert phaticity ratio to %
+    phaticity_df["phaticity_ratio"] = (phaticity_df["phaticity_ratio"] * 100).round(2)
+    
     # can you do a moving average
-    #phaticity_df["average_phaticity_ratio"] = phaticity_df["average_phaticity_ratio"].rolling(window=5).mean()
+    phaticity_df["phaticity_ratio"] = phaticity_df["phaticity_ratio"].rolling(window=5, min_periods=1).mean()
     
     fig = px.bar(
         phaticity_df, 
         x="normalized_time", 
-        y="average_phaticity_ratio",
+        y="phaticity_ratio",
         labels={"normalized_time": "Normalized Time (%)", "average_phaticity_ratio": "Average Phaticity Ratio"},
         title="Average Phaticity Ratio Distribution Over Normalized Time",
     )
     #fig.update_layout()
     fig.show()
 
+def plot_histogram_conv(df):
+    conversation_ids = df["conversation_id"].unique()
+    counter = 0
+    for conversation_id in conversation_ids:
+        counter += 1
+        if counter > 15:
+            break
+        conv_df = df[df["conversation_id"] == conversation_id]
+        conv_df["phaticity ratio"] = conv_df["phaticity ratio"].apply(lambda x: 1 if x >= 0.5 else 0)
+        phaticity_df = conv_df.groupby("audio_start_offset").agg(
+            phaticity_ratio_1_count=("phaticity ratio", lambda x: (x == 1).sum()),
+            phaticity_ratio_all_count=("phaticity ratio", "count"),
+        ).reset_index()
+
+        phaticity_df['phaticity_ratio'] = phaticity_df['phaticity_ratio_1_count'] / phaticity_df['phaticity_ratio_all_count']
+        # convert phaticity ratio to %
+        phaticity_df["phaticity_ratio"] = (phaticity_df["phaticity_ratio"] * 100).round(2)
+        
+        # can you do a moving average
+        phaticity_df["phaticity_ratio"] = phaticity_df["phaticity_ratio"].rolling(window=5, min_periods=1).mean()
+        
+        fig = px.bar(
+            phaticity_df, 
+            x="audio_start_offset", 
+            y="phaticity_ratio",
+            labels={"audio_start_offset": "Audio Start Offset", "phaticity_ratio": "Phaticity Ratio (%)"},
+            title=f"Phaticity Ratio Distribution for Conversation {conversation_id}",
+        )
+        fig.show()
+
 
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\output_filled_phatic_ratio.pkl"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\data_llama70B_processed_output.pkl_temp_24000.pkl"
     print("Loading data")
     df = load_data(input_path)
     print("Data loaded")
@@ -107,8 +144,9 @@ if __name__ == "__main__":
     print("Plotting histogram")
     conversation = False
 
-    plot_histogram(df)
+    #plot_histogram(df)
+    #plot_histogram_conv(df)
     
     # save as pickle and csv
-    # df.to_pickle(input_path.replace(".pkl", "_phatic_ratio.pkl"))
+    df.to_pickle(input_path.replace(".pkl", "_phatic_ratio.pkl"))
     df.to_csv(input_path.replace(".pkl", "_phatic_ratio.csv"))

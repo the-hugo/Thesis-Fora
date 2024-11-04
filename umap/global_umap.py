@@ -175,7 +175,7 @@ class GlobalEmbeddingVisualizer:
                 conversation_info = self.create_conversation_info(group_columns)
             else:
                 print("Aggregating on conversation level")
-                group_columns = ["conversation_id", "speaker_name"]
+                group_columns = ["conversation_id"]
                 conversation_info = self.create_conversation_info(group_columns)
 
             self.speaker_embeddings = (

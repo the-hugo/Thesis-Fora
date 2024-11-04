@@ -28,7 +28,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    input_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/annotated/data_llama70B_processed_output_phatic_ratio.pkl_temp_7200_phatic_ratio.pkl"
+    input_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/annotated/data_llama70B_processed_output_phatic_ratio.pkl_temp_24000_phatic_ratio.pkl"
     model_save_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/random_forest_regressor.pkl"
     output_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output_filled_phatic_ratio.pkl"
 
