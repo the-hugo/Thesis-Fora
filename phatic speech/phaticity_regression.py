@@ -34,6 +34,8 @@ if __name__ == "__main__":
 
     # Load and preprocess data
     data = load_data(input_path)
+    # use a fraction of the data for testing
+    #data = data.sample(frac=0.01, random_state=42)
     data = data.dropna(subset=["Latent-Attention_Embedding"])
     data["Latent-Attention_Embedding"] = data["Latent-Attention_Embedding"].apply(np.array)
     data.rename(columns={"Latent-Attention_Embedding": "Latent_Attention_Embedding"}, inplace=True)
@@ -43,14 +45,18 @@ if __name__ == "__main__":
     data_missing_ratio = data[data["phaticity ratio"].isna()]
 
     # Define input (X) and target (y) for training the regressor
+    print("starting training")
+    
     X = np.hstack((np.stack(data_with_ratio["Latent_Attention_Embedding"].apply(lambda x: np.array(x))), data_with_ratio[["duration"]].values))
     y = data_with_ratio["phaticity ratio"].astype(float)
 
     # Train-test split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+    print("fr")
+    
     # Initialize and train the regression model
-    model = RandomForestRegressor(random_state=42)
+    model = RandomForestRegressor(n_jobs=-1, random_state=42)
     model.fit(X_train, y_train)
 
     # Save the model
