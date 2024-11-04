@@ -212,8 +212,12 @@ class GlobalEmbeddingVisualizer:
 
 
     def plot_aggregated(self):
-        # remove all rows that have NaN in phaticity ratio
         
+        """
+        Phatic Speech Part
+        """
+        
+        # remove all rows that have NaN in phaticity ratio
         initial_count = len(self.df)
         self.df = self.df.dropna(subset=["phaticity ratio"])
         dropped_count = initial_count - len(self.df)
@@ -221,6 +225,10 @@ class GlobalEmbeddingVisualizer:
         
         # set a threshold. everything above 0.5 is rounded to 1, everything below is rounded to 0
         self.df["phaticity ratio"] = self.df["phaticity ratio"].apply(lambda x: 1 if x >= 0.5 else 0)
+        
+        """
+        End of Phatic Speech Part
+        """
         
         self.compute_aggregated_embeddings()
         embedding_2d = self.compute_umap(self.speaker_embeddings)
@@ -263,8 +271,8 @@ class GlobalEmbeddingVisualizer:
             hover_name="speaker_name",
             hover_data=hover_data,
             color_continuous_scale=[
-                (0, "gray"), (0.001, "blue"), (1, "red")
-            ],  # Gray for NaN, blue for low, red for high
+            (0, "#ffc600"), (0.001, "#ffc600"), (1, "#00a4eb")
+            ],  # Gray for NaN, yellow for low, blue for high
             range_color=[0, 1],  # Color range for phaticity ratio between 0 and 1
         )
 

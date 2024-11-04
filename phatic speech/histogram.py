@@ -59,7 +59,6 @@ def match_pattern(df):
 
 
 def plot_histogram(df):
-    # Calculate conversation duration and normalized time
     df["conversation_duration"] = df.groupby("conversation_id")[
         "audio_end_offset"
     ].transform("max") - df.groupby("conversation_id")["audio_start_offset"].transform(
@@ -74,17 +73,16 @@ def plot_histogram(df):
         / df["conversation_duration"]
     )
     
-    # Discretize normalized time into intervals of 1%
     df["normalized_time"] = df["normalized_time"].round().astype(int)
     
-    # Calculate the sum of phaticity ratio and turn count per normalized time interval
     phaticity_df = df.groupby("normalized_time").agg(
         phaticity_ratio_sum=("phaticity ratio", "sum"),
         turn_count=("conversation_id", "count")
     ).reset_index()
     phaticity_df["average_phaticity_ratio"] = phaticity_df["phaticity_ratio_sum"] / phaticity_df["turn_count"]
-
-    # Plot histogram using Plotly
+    # can you do a moving average
+    #phaticity_df["average_phaticity_ratio"] = phaticity_df["average_phaticity_ratio"].rolling(window=5).mean()
+    
     fig = px.bar(
         phaticity_df, 
         x="normalized_time", 
@@ -92,7 +90,7 @@ def plot_histogram(df):
         labels={"normalized_time": "Normalized Time (%)", "average_phaticity_ratio": "Average Phaticity Ratio"},
         title="Average Phaticity Ratio Distribution Over Normalized Time",
     )
-    fig.update_layout(bargap=0.2)
+    #fig.update_layout()
     fig.show()
 
 
@@ -108,7 +106,7 @@ if __name__ == "__main__":
 
     print("Plotting histogram")
     conversation = False
-    # plot the phaticity ratio over normalised time
+
     plot_histogram(df)
     
     # save as pickle and csv
