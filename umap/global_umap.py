@@ -175,7 +175,7 @@ class GlobalEmbeddingVisualizer:
                 conversation_info = self.create_conversation_info(group_columns)
             else:
                 print("Aggregating on conversation level")
-                group_columns = ["conversation_id"]
+                group_columns = ["conversation_id", "speaker_name"]
                 conversation_info = self.create_conversation_info(group_columns)
 
             self.speaker_embeddings = (
@@ -240,12 +240,12 @@ class GlobalEmbeddingVisualizer:
 
         # Determine the coloring mode based on 'color_by_role' parameter
         if self.color_by_role == "f_p":
-            color_column = "role"  # Use the mapped 'role' column
+            color_column = "symbol"  # Use the mapped 'role' column
             custom_color_palette = [
                 "#ffc600",
                 "#00a4eb",
             ]  # Colors for Facilitator and Participant
-            legend_title = "Role"
+            legend_title = "Symbol"
         else:
             color_column = "collection_title"
             custom_color_palette = (

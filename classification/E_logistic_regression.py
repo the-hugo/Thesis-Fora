@@ -21,7 +21,7 @@ def load_data(input_path):
 
 
 if __name__ == "__main__":
-    input_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/umap/data_nv-embed_processed_output.pkl"
+    input_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/embeddings/data_nv-embed_processed_output.pkl"
     model_save_path = "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/random_forest_models_smoteenn.pkl"
 
     data = load_data(input_path)

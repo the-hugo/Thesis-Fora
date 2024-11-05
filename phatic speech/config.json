@@ -1,7 +1,7 @@
 {
   "model": "nv-embed",
   "aggregate_on_collection": false,
-  "show_only": "participants",
+  "show_only": "facilitators",
   "aggregate_embeddings": false,
   "truncate_turns": false,
   "collection_name": "corpus_data",

@@ -136,6 +136,12 @@ class EmbeddingVisualizer:
         valid_conversation_ids = np.intersect1d(conversation_ids_with_speakers, conversation_ids_in_collections)
         self.df = self.df[self.df['conversation_id'].isin(valid_conversation_ids)]
         """
+        # please only plot conversation_ids Top 10
+        valid_conversation_ids = [
+            871, 2061, 804, 1740, 654, 910, 2261, 581, 2089, 524,
+            2179, 812, 870, 720, 919, 2409, 787, 2358, 2188, 1103
+        ]
+        self.df = self.df[self.df['conversation_id'].isin(valid_conversation_ids)]
 
         for conversation_id, group in self.df.groupby("conversation_id"):
             embedding_2d = self.compute_umap(group)
