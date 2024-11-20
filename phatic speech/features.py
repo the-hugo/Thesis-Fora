@@ -53,12 +53,13 @@ def compute_ratios(group):
     return group
 
 
-def aggregate_conv(df):
+def aggregate_conv(df, participants):
     # kick out all non-facilitator rows
-    df = df[df["is_fac"]]
+    n_participants = not participants
+    df = df[df["is_fac"] == n_participants]
     
     # kick out all non-annotated ones
-    df = df[df["annotated"]]
+    #df = df[df["annotated"]]
     # bucket fac:
     # Validation Strategies: Express appreciation, Express affirmation
     # Invitations to Participate: Open invitation, Specific invitation
@@ -113,14 +114,19 @@ if __name__ == "__main__":
     )
     df = df.groupby("conversation_id").apply(compute_ratios).reset_index(drop=True)
 
-    df = aggregate_conv(df)
+    participants = False
+    df = aggregate_conv(df, participants)
     
     calculate_correlation(df)
 
-    # save the dataframe
-    df.to_csv(
-        r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features.csv"
-    )
+    if participants:
+        df.to_csv(
+            r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features.csv"
+        )
+    else:
+        df.to_csv(
+            r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features.csv"
+        )
 
 """
 df.drop(

@@ -57,12 +57,15 @@ def process_dataframe(df, text_column, max_words=100):
     processed_rows = []
 
     for _, row in df.iterrows():
-        text = row[text_column]
-        chunks = process_text_snippet(text, max_words)
-        for chunk in chunks:
-            new_row = row.copy()
-            new_row[text_column] = chunk
-            processed_rows.append(new_row)
+        try:
+            text = row[text_column]
+            chunks = process_text_snippet(text, max_words)
+            for chunk in chunks:
+                new_row = row.copy()
+                new_row[text_column] = chunk
+                processed_rows.append(new_row)
+        except ValueError:
+            print(text)
 
     # Create a new DataFrame with the processed rows
     return pd.DataFrame(processed_rows)
@@ -73,12 +76,12 @@ def load_data(input_path):
     Load data from a CSV file.
     """
     print(f"Loading data from {input_path}")
-    return pd.read_csv(input_path)
+    return pd.read_pickle(input_path)
 
 # Main function
 if __name__ == "__main__":
     # Load the data
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\LIWC-22 Results - data_llama70B_processed_output___ - LIWC Analysis_small.csv"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\data_llama70B_processed_output.pkl"
     df = load_data(input_path)
 
     # Column containing the text snippets

@@ -71,8 +71,9 @@ def preprocessing(df):
     combined_features = prepare_data(combined_features)
     return combined_features
 
+
 def apply_umap(combined_features):
-    
+
     scaled_X = StandardScaler().fit_transform(combined_features)
 
     # Set the number of UMAP components
@@ -195,7 +196,7 @@ def show_centroids(centroids, df, n_clusters):
 
 
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features.csv"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features.csv"
     print("Loading data")
     df = load_data(input_path)
     # df = df.dropna(subset=["Latent_Attention_Embedding"])
@@ -205,16 +206,21 @@ if __name__ == "__main__":
     # df = aggregate_features(df)
 
     # Exclude specific columns
-    #exclude_columns = ["Facilitation_Strategies", "Invitations_to_Participate", "Validation_Strategies"]
-    #df = df.drop(columns=exclude_columns)
-    
+    exclude_columns = ["Facilitation_Strategies", "Invitations_to_Participate", "Validation_Strategies"]
+    #exclude_columns = ["Rc", "Rd"]
+    df = df.drop(columns=exclude_columns)
+
     print("Applying UMAP to all features")
     df = preprocessing(df)
-    
+
     n_clusters = determine_cluster(df)
 
     print("K-means clustering")
     df = k_means(df, n_clusters)
-    
+
     df = apply_umap(df)
     plot_clusters(df)
+    
+    # Save the clustered data
+    output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_clustered.csv"
+    df.to_csv(output_path, index=False)
