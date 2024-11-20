@@ -22,9 +22,10 @@ if __name__ == "__main__":
     df = df.dropna(subset=["Latent-Attention_Embedding"])
 
     # filter samples with less than 20 chars
-    #df_sampled = df[df["words"].str.len() >= 20]
+    df_sampled = df[df["words"].str.len() >= 20]
 
     # groupby speaker name and conversation id and concatenate all words
+    
     df_sampled = df.groupby(["speaker_name", "conversation_id"]).agg({
         "words": lambda x: " ".join(x),
         "Latent-Attention_Embedding": lambda x: np.mean(np.vstack(x), axis=0)
