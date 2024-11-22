@@ -19,18 +19,18 @@ def load_data(input_path):
 
 def aggregate_features(df):
     df["speaker_name"] = df["speaker_name"].str.lower().str.strip()
-    # Removing text within brackets and unnecessary speaker labels
     df["speaker_name"] = df["speaker_name"].str.replace(r"\[.*\]", "", regex=True)
     df = df[
         ~df["speaker_name"].str.contains(
             "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
         )
     ]
+    df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
+
     df = df.drop(columns=["Unnamed: 0", "id"])
 
     # Handle numeric columns and clean up any extra spaces
     numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
 
     # Handle Latent_Attention_Embedding by converting lists to arrays if not already
     df["Latent_Attention_Embedding"] = df["Latent_Attention_Embedding"].apply(
@@ -60,8 +60,8 @@ def preprocessing(df):
     combined_features = np.hstack((latent_attention_embeddings, other_features))
     """
 
-    combined_features = df.drop(columns=["speaker_name", "conversation_id"])
-
+    # combined_features = df.drop(columns=["speaker_name", "conversation_id"])
+    combined_features = df.copy()
     rows_before = combined_features.shape[0]
     combined_features = combined_features.dropna()
     rows_after = combined_features.shape[0]
@@ -73,6 +73,13 @@ def preprocessing(df):
 
 
 def apply_umap(combined_features):
+    # Preserve 'conversation_id' and 'speaker_name' columns
+    preserved_columns = combined_features[
+        ["conversation_id", "speaker_name"]
+    ].reset_index(drop=True)
+    combined_features = combined_features.drop(
+        columns=["conversation_id", "speaker_name"]
+    ).reset_index(drop=True)
 
     scaled_X = StandardScaler().fit_transform(combined_features)
 
@@ -81,33 +88,81 @@ def apply_umap(combined_features):
     reducer = umap.UMAP(n_components=n_components, random_state=42)
     embedding = reducer.fit_transform(scaled_X)
 
-    # Add UMAP dimensions to df
+    # Add UMAP dimensions to combined_features
     for i in range(n_components):
         combined_features[f"umap_{i}"] = embedding[:, i]
+
+    # Add back the preserved columns
+    combined_features = pd.concat([preserved_columns, combined_features], axis=1)
     return combined_features
 
 
 def plot_clusters(df):
-    fig = px.scatter(df, x="umap_0", y="umap_1", color="cluster", hover_name="cluster")
+    fig = px.scatter(
+        df, x="umap_0", y="umap_1", color="cluster", hover_name="speaker_name"
+    )
     fig.show()
 
 
 def k_means(df, n_clusters):
+    # Preserve 'conversation_id' and 'speaker_name' columns
+    preserved_columns = df[["conversation_id", "speaker_name"]].reset_index(drop=True)
+    df = df.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
+
     # Use UMAP features only for clustering
     umap_features = df.columns
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     df["cluster"] = kmeans.fit_predict(df[umap_features])
     centroids = kmeans.cluster_centers_
     show_centroids(centroids, df, n_clusters)
+
+    # Add back the preserved columns
+    df = pd.concat([preserved_columns, df], axis=1)
     return df
 
 
 def prepare_data(df):
-    # Drop the 'WC' column if it exists
-    if "WC" in df.columns:
-        df = df.drop(columns=["WC"])
+    df["speaker_name"] = df["speaker_name"].str.lower().str.strip()
+    df["speaker_name"] = df["speaker_name"].str.replace(r"\[.*\]", "", regex=True)
+    df = df[
+        ~df["speaker_name"].str.contains(
+            "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
+        )
+    ]
+    df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
+
+    selection = True
+    if selection:
+        features = [
+            "phaticity ratio",
+            "Analytic",
+            "Clout",
+            "Authentic",
+            "Tone",
+            "WPS",
+            "duration",
+            "Rd",
+            "Rc",
+            "Personal story",
+            "Personal experience",
+            #"QMark",
+            #"Validation Strategies",
+            #"Invitations to Participate",
+            #"Facilitation Strategies",
+            "Cognition",
+            "Social"
+        ]
+    else:
+        features = df.columns.difference(
+            ["Unnamed: 0", "conversation_id", "speaker_name"]
+        )
+
     # Winsorize the data to handle outliers
     # Normalize the data to have zero mean and unit variance
+    # Preserve 'conversation_id' and 'speaker_name' columns
+    preserved_columns = df[["conversation_id", "speaker_name"]].reset_index(drop=True)
+    df = df.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
+    df = df[features]
     df = pd.DataFrame(StandardScaler().fit_transform(df), columns=df.columns)
     # Apply winsorization to each column
     for col in df.columns:
@@ -115,7 +170,6 @@ def prepare_data(df):
             df[col] = winsorize(df[col], limits=[0.05, 0.05])
 
     # Assess multicollinearity using Variance Inflation Factor (VIF)
-
     vif_data = pd.DataFrame()
     vif_data["feature"] = df.columns
     vif_data["VIF"] = [
@@ -124,8 +178,11 @@ def prepare_data(df):
     print("VIF Data:\n", vif_data)
 
     # Assess collinearity using Pearson correlations
-    correlation_matrix = df.corr()
+    df.corr()
     # print("Correlation Matrix:\n", correlation_matrix)
+
+    # Add back the preserved columns
+    df = pd.concat([preserved_columns, df], axis=1)
 
     return df
 
@@ -176,7 +233,12 @@ def determine_cluster(df, max_clusters=10, random_state=42):
 
 
 def show_centroids(centroids, df, n_clusters):
+    # Ensure column names are stripped of leading/trailing spaces
+    df.columns = df.columns.str.strip()
+
+    # Exclude the "cluster" column
     feature_columns = df.columns[df.columns != "cluster"]
+
     centroids_df = pd.DataFrame(centroids, columns=feature_columns)
     centroids_df.index.name = "Cluster"
 
@@ -185,6 +247,8 @@ def show_centroids(centroids, df, n_clusters):
     for cluster_idx in range(n_clusters):
         plt.figure(figsize=(12, 6))
         deviations = centroids_df.iloc[cluster_idx] - feature_means
+        # exclude cluster from deviations
+        deviations = deviations[deviations.index != "cluster"]
         deviations.plot(kind="bar", color="skyblue", edgecolor="black")
         plt.axhline(0, color="gray", linestyle="--")
         plt.title(f"Cluster {cluster_idx} Feature Deviations from Mean")
@@ -192,11 +256,12 @@ def show_centroids(centroids, df, n_clusters):
         plt.ylabel("Deviation from Mean")
         plt.tight_layout()
         plt.show()
+
     return centroids_df
 
 
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features.csv"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
     print("Loading data")
     df = load_data(input_path)
     # df = df.dropna(subset=["Latent_Attention_Embedding"])
@@ -206,21 +271,28 @@ if __name__ == "__main__":
     # df = aggregate_features(df)
 
     # Exclude specific columns
-    exclude_columns = ["Facilitation_Strategies", "Invitations_to_Participate", "Validation_Strategies"]
-    #exclude_columns = ["Rc", "Rd"]
-    df = df.drop(columns=exclude_columns)
+    # exclude_columns = [
+    #    "Facilitation Strategies",
+    #    "Invitations to Participate",
+    #    "Validation Strategies",
+    # ]
+    # exclude_columns = ["Rc", "Rd"]
+    # df = df.drop(columns=exclude_columns)
 
     print("Applying UMAP to all features")
     df = preprocessing(df)
 
-    n_clusters = determine_cluster(df)
+    # exclude non-numeric columns
+    df_n = df.drop(columns=["conversation_id", "speaker_name"])
+    n_clusters = determine_cluster(df_n)
 
     print("K-means clustering")
     df = k_means(df, n_clusters)
 
     df = apply_umap(df)
     plot_clusters(df)
-    
+
     # Save the clustered data
-    output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_clustered.csv"
+    output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_clustered.csv"
     df.to_csv(output_path, index=False)
+    
