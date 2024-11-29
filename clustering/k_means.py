@@ -130,7 +130,9 @@ def prepare_data(df):
         )
     ]
     df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
-
+    # kick every row out where adherence_to_guide is nan
+    #df = df.dropna(subset=["adherence_to_guide"])
+    
     selection = True
     if selection:
         features = [
@@ -139,24 +141,41 @@ def prepare_data(df):
             "Clout",
             "Authentic",
             "Tone",
-            "WPS",
-            "duration",
-            "Rd",
-            "Rc",
+            #"WPS",
+            #"duration",
+            #"Rd",
+            #"Rc",
             "Personal story",
             "Personal experience",
             #"QMark",
             #"Validation Strategies",
-            #"Invitations to Participate",
-            #"Facilitation Strategies",
+            "Invitations to Participate",
+            "Facilitation Strategies",
             "Cognition",
-            "Social"
+            "Social",
+            "Responsivity",
+            #"fac_to_part_ratio",
+            #"participant_semantic_speed",
+            #"facilitator_semantic_speed",
+            #"role_change_rate",
+            #"adherence_to_guide"
         ]
     else:
         features = df.columns.difference(
             ["Unnamed: 0", "conversation_id", "speaker_name"]
         )
 
+    # plot a correlation matrix
+    correlation_matrix = df[features].corr()
+    plt.figure(figsize=(12, 6))
+    plt.title("Correlation Matrix")
+    plt.imshow(correlation_matrix, cmap="coolwarm", interpolation="nearest")
+    plt.colorbar()
+    plt.xticks(range(len(features)), features, rotation=45)
+    plt.yticks(range(len(features)), features)
+    plt.tight_layout()
+    plt.show()
+    
     # Winsorize the data to handle outliers
     # Normalize the data to have zero mean and unit variance
     # Preserve 'conversation_id' and 'speaker_name' columns
@@ -295,4 +314,3 @@ if __name__ == "__main__":
     # Save the clustered data
     output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_clustered.csv"
     df.to_csv(output_path, index=False)
-    

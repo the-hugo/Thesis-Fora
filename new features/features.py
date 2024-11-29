@@ -13,7 +13,7 @@ def load_data(input_path):
 
 
 def calculate_correlation(df):
-    
+
     correlation_matrix = df.corr()
 
     correlation_threshold = 0.15
@@ -55,12 +55,42 @@ def compute_ratios(group):
 
 
 def aggregate_conv(df, participants):
+    # calculate the rate of Facilitator to Participant change. How often do the roles change in turn taking over all turn?
+    df = df.sort_values(by=["conversation_id", "SpeakerTurn"])
+    
+    # Identify role changes (True if role changes between consecutive turns)
+    df["role_change"] = df.groupby("conversation_id")["is_fac"].apply(lambda x: x != x.shift(1)).reset_index(level=0, drop=True)
+    
+    # Count role changes per conversation
+    role_change_counts = df.groupby("conversation_id")["role_change"].sum().reset_index()
+    role_change_counts = role_change_counts.rename(columns={"role_change": "role_change_count"})
+    
+    # Total turns per conversation
+    total_turns = df.groupby("conversation_id")["SpeakerTurn"].count().reset_index()
+    total_turns = total_turns.rename(columns={"SpeakerTurn": "total_turns"})
+    
+    # Merge counts and calculate the role change rate
+    role_change_rate_df = pd.merge(role_change_counts, total_turns, on="conversation_id")
+    role_change_rate_df["role_change_rate"] = role_change_rate_df["role_change_count"] / (role_change_rate_df["total_turns"] - 1)
+    
+    # merge the role_change_rate column to the main dataframe
+    df = pd.merge(df, role_change_rate_df[["conversation_id", "role_change_rate"]], on="conversation_id")
+    
     # kick out all non-facilitator rows
     n_participants = not participants
     df = df[df["is_fac"] == n_participants]
+    
+    if not participants:
+        df["SpeakerTurn"] = df.groupby(["conversation_id", "speaker_name"]).cumcount() + 1
+        # now I need the max number of turns per conversation per facilitator
+        max_turns = df.groupby(["conversation_id", "speaker_name"])["SpeakerTurn"].max().reset_index()
+        # kick out all rows in df with the conversation_id that corresponds to max_turns where SpekaerTurn is smaller than 7
+        df = df[~df["conversation_id"].isin(max_turns[max_turns["SpeakerTurn"] < 7]["conversation_id"])]
 
+        
+    #df = df[(df["is_fac"] == n_participants) | (df["cofacilitated"] == True)]
     # kick out all non-annotated ones
-    #df = df[df["annotated"]]
+    # df = df[df["annotated"]]
     # bucket fac:
     # Validation Strategies: Express appreciation, Express affirmation
     # Invitations to Participate: Open invitation, Specific invitation
@@ -85,7 +115,7 @@ def aggregate_conv(df, participants):
         "audio_end_offset",
         "speaker_id",
         "is_fac",
-        "cofacilitated",
+        # "cofacilitated",
         "annotated",
         "start_time",
         "location",
@@ -114,6 +144,7 @@ def aggregate_conv(df, participants):
         "phaticity ratio": "mean",
         "Rd": "first",
         "Rc": "first",
+        "role_change_rate": "first",
         "Personal story": "sum",
         "Personal experience": "sum",
     }
@@ -145,10 +176,10 @@ if __name__ == "__main__":
     )
     df = df.groupby("conversation_id").apply(compute_ratios).reset_index(drop=True)
 
-    participants = True
+    participants = False
     df = aggregate_conv(df, participants)
 
-    #calculate_correlation(df)
+    # calculate_correlation(df)
 
     if participants:
         df.to_csv(

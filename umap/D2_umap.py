@@ -137,12 +137,13 @@ class EmbeddingVisualizer:
         self.df = self.df[self.df['conversation_id'].isin(valid_conversation_ids)]
         """
         # please only plot conversation_ids Top 10
-        valid_conversation_ids = [
-            871, 2061, 804, 1740, 654, 910, 2261, 581, 2089, 524,
-            2179, 812, 870, 720, 919, 2409, 787, 2358, 2188, 1103
-        ]
-        self.df = self.df[self.df['conversation_id'].isin(valid_conversation_ids)]
-
+        # valid_conversation_ids = [
+        #     871, 2061, 804, 1740, 654, 910, 2261, 581, 2089, 524,
+        #     2179, 812, 870, 720, 919, 2409, 787, 2358, 2188, 1103
+        # ]
+        # self.df = self.df[self.df['conversation_id'].isin(valid_conversation_ids)]
+        # remove non-facilitators
+        self.df = self.df[~self.df["is_fac"]]
         for conversation_id, group in self.df.groupby("conversation_id"):
             embedding_2d = self.compute_umap(group)
             group["UMAP_1"] = embedding_2d[:, 0]
@@ -159,9 +160,9 @@ class EmbeddingVisualizer:
                 group,
                 x="UMAP_1",
                 y="UMAP_2",
-                color="Facilitator",
+                color="SpeakerTurn",
+                symbol="Facilitator",
                 title=f"{self.model}: Embedding for Conversation {conversation_id} in {collection_name}",
-                # labels={'Words': 'Content', "Duration": "duration"},
                 hover_name="speaker_name",
                 hover_data={
                     "SpeakerTurn": True,
@@ -171,10 +172,8 @@ class EmbeddingVisualizer:
                     "UMAP_1": False,
                     "UMAP_2": False,
                 },
-                color_discrete_map={
-                    "Facilitator": "#ffc600",
-                    "Non-Facilitator": "#00a4eb",
-                },
+                color_discrete_sequence=px.colors.qualitative.Plotly,
+                symbol_map={"Facilitator": "circle", "Non-Facilitator": "square"},
             )
             if "&" in collection_name:
                 collection_name = collection_name.replace("&", "and").replace(":", " ")
@@ -190,6 +189,25 @@ class EmbeddingVisualizer:
                 + str(conversation_id)
                 + ".html"
             )
+
+            # Draw directed arrows based on SpeakerTurn
+            for i in range(len(group) - 1):
+                fig.add_annotation(
+                    x=group.iloc[i + 1]["UMAP_1"],
+                    y=group.iloc[i + 1]["UMAP_2"],
+                    ax=group.iloc[i]["UMAP_1"],
+                    ay=group.iloc[i]["UMAP_2"],
+                    xref="x",
+                    yref="y",
+                    axref="x",
+                    ayref="y",
+                    showarrow=True,
+                    arrowhead=2,
+                    arrowsize=1,
+                    arrowwidth=1,
+                    arrowcolor="black",
+                )
+                
             fig.write_html(final_output_path)
             fig.show()
             print(
