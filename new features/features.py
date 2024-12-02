@@ -176,7 +176,7 @@ if __name__ == "__main__":
     )
     df = df.groupby("conversation_id").apply(compute_ratios).reset_index(drop=True)
 
-    participants = False
+    participants = True
     df = aggregate_conv(df, participants)
 
     # calculate_correlation(df)

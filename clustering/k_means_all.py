@@ -75,10 +75,10 @@ def preprocessing(df):
 def apply_umap(combined_features):
     # Preserve 'conversation_id' and 'speaker_name' columns
     preserved_columns = combined_features[
-        ["conversation_id", "speaker_name"]
+        ["conversation_id", "speaker_name", "is_fac", "cofacilitated"]
     ].reset_index(drop=True)
     combined_features = combined_features.drop(
-        columns=["conversation_id", "speaker_name"]
+        columns=["conversation_id", "speaker_name", "is_fac", "cofacilitated"]
     ).reset_index(drop=True)
 
     scaled_X = StandardScaler().fit_transform(combined_features)
@@ -98,16 +98,19 @@ def apply_umap(combined_features):
 
 
 def plot_clusters(df):
+    # every is_fac shall be true when cofacilitated is 1 or it is true
+    df["is_fac"] = df["is_fac"] | (df["cofacilitated"] == 1)
+    
     fig = px.scatter(
-        df, x="umap_0", y="umap_1", color="cluster", hover_name="speaker_name"
+        df, x="umap_0", y="umap_1", color="is_fac", hover_name="speaker_name"
     )
     fig.show()
 
 
 def k_means(df, n_clusters):
     # Preserve 'conversation_id' and 'speaker_name' columns
-    preserved_columns = df[["conversation_id", "speaker_name"]].reset_index(drop=True)
-    df = df.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
+    preserved_columns = df[["conversation_id", "speaker_name", "is_fac", "cofacilitated"]].reset_index(drop=True)
+    df = df.drop(columns=["conversation_id", "speaker_name", "is_fac", "cofacilitated"]).reset_index(drop=True)
 
     # Use UMAP features only for clustering
     umap_features = df.columns
@@ -141,16 +144,16 @@ def prepare_data(df):
             "Clout",
             "Authentic",
             "Tone",
-            "WPS",
+            #"WPS",
             #"duration",
             #"Rd",
             #"Rc",
-            "Personal story",
-            "Personal experience",
-            #"QMark",
+            #"Personal story",
+            #"Personal experience",
+            "QMark",
             #"Validation Strategies",
-            "Invitations to Participate",
-            "Facilitation Strategies",
+            #"Invitations to Participate",
+            #"Facilitation Strategies",
             "Cognition",
             "Social",
             "Responsivity",
@@ -179,8 +182,8 @@ def prepare_data(df):
     # Winsorize the data to handle outliers
     # Normalize the data to have zero mean and unit variance
     # Preserve 'conversation_id' and 'speaker_name' columns
-    preserved_columns = df[["conversation_id", "speaker_name"]].reset_index(drop=True)
-    df = df.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
+    preserved_columns = df[["conversation_id", "speaker_name", "is_fac", "cofacilitated"]].reset_index(drop=True)
+    df = df.drop(columns=["conversation_id", "speaker_name", "is_fac", "cofacilitated"]).reset_index(drop=True)
     df = df[features]
     df = pd.DataFrame(StandardScaler().fit_transform(df), columns=df.columns)
     # Apply winsorization to each column
@@ -280,9 +283,23 @@ def show_centroids(centroids, df, n_clusters):
 
 
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
+    input_path_f = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
+    input_path_p = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_big.csv"
     print("Loading data")
-    df = load_data(input_path)
+    df = load_data(input_path_f)
+    df["is_fac"] = True
+    
+    df_p = load_data(input_path_p)
+    
+    df = pd.concat([df, df_p])
+    
+    df["is_fac"] = df["is_fac"].fillna(False)
+    # which cokumns have nan values
+    print(df.columns[df.isna().any()].tolist())
+    
+    # fill na
+    df = df.fillna(0)
+
     # df = df.dropna(subset=["Latent_Attention_Embedding"])
     # df = df[df["is_fac"] == False]
 
