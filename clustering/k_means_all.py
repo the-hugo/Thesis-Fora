@@ -75,10 +75,10 @@ def preprocessing(df):
 def apply_umap(combined_features):
     # Preserve 'conversation_id' and 'speaker_name' columns
     preserved_columns = combined_features[
-        ["conversation_id", "speaker_name", "is_fac", "cofacilitated"]
+        ["conversation_id", "speaker_name", "is_fac"]
     ].reset_index(drop=True)
     combined_features = combined_features.drop(
-        columns=["conversation_id", "speaker_name", "is_fac", "cofacilitated"]
+        columns=["conversation_id", "speaker_name", "is_fac"]
     ).reset_index(drop=True)
 
     scaled_X = StandardScaler().fit_transform(combined_features)
@@ -99,7 +99,7 @@ def apply_umap(combined_features):
 
 def plot_clusters(df):
     # every is_fac shall be true when cofacilitated is 1 or it is true
-    df["is_fac"] = df["is_fac"] | (df["cofacilitated"] == 1)
+    df["is_fac"] = df["is_fac"]
     
     fig = px.scatter(
         df, x="umap_0", y="umap_1", color="is_fac", hover_name="speaker_name"
@@ -109,8 +109,8 @@ def plot_clusters(df):
 
 def k_means(df, n_clusters):
     # Preserve 'conversation_id' and 'speaker_name' columns
-    preserved_columns = df[["conversation_id", "speaker_name", "is_fac", "cofacilitated"]].reset_index(drop=True)
-    df = df.drop(columns=["conversation_id", "speaker_name", "is_fac", "cofacilitated"]).reset_index(drop=True)
+    preserved_columns = df[["conversation_id", "speaker_name", "is_fac"]].reset_index(drop=True)
+    df = df.drop(columns=["conversation_id", "speaker_name", "is_fac"]).reset_index(drop=True)
 
     # Use UMAP features only for clustering
     umap_features = df.columns
@@ -182,8 +182,8 @@ def prepare_data(df):
     # Winsorize the data to handle outliers
     # Normalize the data to have zero mean and unit variance
     # Preserve 'conversation_id' and 'speaker_name' columns
-    preserved_columns = df[["conversation_id", "speaker_name", "is_fac", "cofacilitated"]].reset_index(drop=True)
-    df = df.drop(columns=["conversation_id", "speaker_name", "is_fac", "cofacilitated"]).reset_index(drop=True)
+    preserved_columns = df[["conversation_id", "speaker_name", "is_fac"]].reset_index(drop=True)
+    df = df.drop(columns=["conversation_id", "speaker_name", "is_fac"]).reset_index(drop=True)
     df = df[features]
     df = pd.DataFrame(StandardScaler().fit_transform(df), columns=df.columns)
     # Apply winsorization to each column

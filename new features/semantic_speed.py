@@ -203,5 +203,6 @@ if __name__ == "__main__":
     to_merge = to_merge[
         [col for col in to_merge.columns if not col.endswith("_y") and not col.endswith("_x")]
     ]
+    
     to_merge = to_merge.merge(speeds_df, on="conversation_id")
     to_merge.to_csv(input_path, index=False)

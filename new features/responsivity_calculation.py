@@ -18,7 +18,7 @@ def compute_cosine_similarity(embedding1, embedding2):
     return 1 - cosine(embedding1, embedding2)
 
 
-def compute_responsivity(df, window_size=10, decay_rate=0.1):
+def compute_responsivity(df, window_size=6, decay_rate=0.1):
     """
     Compute speaker responsivity matrix and time-varying responsivity.
 
@@ -76,6 +76,9 @@ def compute_responsivity(df, window_size=10, decay_rate=0.1):
                 np.mean(similarities) if similarities else 0
             )
 
+    # 
+    
+    
     responsivity_df = pd.DataFrame(
         responsivity_matrix, index=speaker_names, columns=speaker_names
     )
@@ -118,7 +121,7 @@ def plot_responsivity_matrix(responsivity_df):
     plt.title("Responsivity Matrix")
     plt.xlabel("Speaker B")
     plt.ylabel("Speaker A")
-    # plt.show()
+    plt.show()
 
 
 def plot_time_varying_responsivity(time_varying_responsivity, speaker_pairs):
@@ -132,7 +135,7 @@ def plot_time_varying_responsivity(time_varying_responsivity, speaker_pairs):
     plt.xlabel("Turn Index")
     plt.ylabel("Responsivity")
     plt.legend()
-    # plt.show()
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -216,7 +219,7 @@ if __name__ == "__main__":
         ]["is_fac"].iloc[0],
         axis=1
     )
-    
+    consolidated_df = consolidated_df[consolidated_df["Responsivity"] != 0]
     total_output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\total_responsivity_matrix.csv"
     consolidated_df.to_pickle(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\total_responsivity_matrix.pkl")
     consolidated_df.to_csv(total_output_path, index=False)

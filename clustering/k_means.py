@@ -59,7 +59,15 @@ def preprocessing(df):
     other_features = df.drop(columns=["speaker_name", "Latent_Attention_Embedding"]).values
     combined_features = np.hstack((latent_attention_embeddings, other_features))
     """
-
+    # Drop columns ending with _x or _y if their counterparts exist
+    for col in df.columns:
+        if col.endswith('_x') and col[:-2] + '_y' in df.columns:
+            df = df.drop(columns=[col])
+            df = df.rename(columns={col[:-2] + '_y': col[:-2]})
+        elif col.endswith('_y') and col[:-2] + '_x' in df.columns:
+            df = df.drop(columns=[col])
+            df = df.rename(columns={col[:-2] + '_x': col[:-2]})
+    
     # combined_features = df.drop(columns=["speaker_name", "conversation_id"])
     combined_features = df.copy()
     rows_before = combined_features.shape[0]
@@ -99,8 +107,29 @@ def apply_umap(combined_features):
 
 def plot_clusters(df):
     fig = px.scatter(
-        df, x="umap_0", y="umap_1", color="cluster", hover_name="speaker_name"
+        df,
+        x="umap_0",
+        y="umap_1",
+        color="cluster",
+        hover_name="speaker_name",
     )
+    # add colors
+    fig.update_traces(marker=dict(size=8, opacity=0.8))
+    fig.update_layout(
+        title="UMAP Clustering",
+        xaxis_title="UMAP Dimension 1",
+        yaxis_title="UMAP Dimension 2",
+        legend_title="Cluster",
+        # use a color mode without yellow
+        coloraxis=dict(
+            colorscale=[
+                [0.0, "rgb(0,0,255)"],
+                [0.5, "rgb(0,255,0)"],
+                [1.0, "rgb(255,0,0)"],
+            ]
+        ),
+    )
+
     fig.show()
 
 
@@ -131,8 +160,8 @@ def prepare_data(df):
     ]
     df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
     # kick every row out where adherence_to_guide is nan
-    #df = df.dropna(subset=["adherence_to_guide"])
-    
+    # df = df.dropna(subset=["adherence_to_guide"])
+
     selection = True
     if selection:
         features = [
@@ -141,24 +170,24 @@ def prepare_data(df):
             "Clout",
             "Authentic",
             "Tone",
-            "WPS",
+            #"WPS",
             #"duration",
-            #"Rd",
-            #"Rc",
-            "Personal story",
-            "Personal experience",
+            "Rd",
+            "Rc",
+            #"Personal story",
+            #"Personal experience",
             #"QMark",
             #"Validation Strategies",
-            "Invitations to Participate",
-            "Facilitation Strategies",
+            #"Invitations to Participate",
+            #"Facilitation Strategies",
             "Cognition",
             "Social",
             "Responsivity",
             #"fac_to_part_ratio",
             #"participant_semantic_speed",
-            #"facilitator_semantic_speed",
+            "facilitator_semantic_speed",
             #"role_change_rate",
-            #"adherence_to_guide"
+            "adherence_to_guide"
         ]
     else:
         features = df.columns.difference(
@@ -175,7 +204,7 @@ def prepare_data(df):
     plt.yticks(range(len(features)), features)
     plt.tight_layout()
     plt.show()
-    
+
     # Winsorize the data to handle outliers
     # Normalize the data to have zero mean and unit variance
     # Preserve 'conversation_id' and 'speaker_name' columns
@@ -310,7 +339,9 @@ if __name__ == "__main__":
 
     df = apply_umap(df)
     plot_clusters(df)
-
+    
+    collection_ids = pd.read_csv(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure.csv")
+    df = df.merge(collection_ids[['conversation_id', 'collection_id']], on="conversation_id")
     # Save the clustered data
     output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_clustered.csv"
     df.to_csv(output_path, index=False)

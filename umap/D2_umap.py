@@ -142,8 +142,8 @@ class EmbeddingVisualizer:
         #     2179, 812, 870, 720, 919, 2409, 787, 2358, 2188, 1103
         # ]
         # self.df = self.df[self.df['conversation_id'].isin(valid_conversation_ids)]
-        # remove non-facilitators
-        self.df = self.df[~self.df["is_fac"]]
+        # remove non-facilitators ~
+        self.df = self.df[self.df["is_fac"]]
         for conversation_id, group in self.df.groupby("conversation_id"):
             embedding_2d = self.compute_umap(group)
             group["UMAP_1"] = embedding_2d[:, 0]

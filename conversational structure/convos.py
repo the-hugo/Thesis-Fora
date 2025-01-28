@@ -3,6 +3,7 @@ import numpy as np
 import re
 from sklearn.metrics.pairwise import cosine_distances
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def gini_coefficient(values):
@@ -88,6 +89,74 @@ def load_data(input_path):
 
 
 def prepare_data(df):
+    # Calculate SpeakerTurn for each speaker within a conversation
+    df["SpeakerTurn"] = df.groupby(["conversation_id", "speaker_name"]).cumcount() + 1
+
+    # Identify max SpeakerTurn for is_fac speakers within each conversation
+    is_fac_turns = (
+        df[df["is_fac"] == True]
+        .groupby(["conversation_id", "speaker_name"])["SpeakerTurn"]
+        .max()
+        .reset_index()
+    )
+
+    # Count the number of unique facilitators (is_fac) in each conversation
+    fac_counts = (
+        df[df["is_fac"] == True]
+        .groupby("conversation_id")["speaker_name"]
+        .nunique()
+        .reset_index(name="fac_count")
+    )
+
+    # Merge facilitator counts back into the main dataframe
+    df = pd.merge(df, fac_counts, on="conversation_id", how="left")
+
+    # Identify conversations with multiple facilitators
+    multi_fac_conversations = fac_counts[fac_counts["fac_count"] > 1]["conversation_id"]
+
+    # Filter facilitator SpeakerTurn data for multi-facilitator conversations
+    multi_fac_turns = is_fac_turns[is_fac_turns["conversation_id"].isin(multi_fac_conversations)]
+
+    # Identify conversations where all facilitators have SpeakerTurn below the threshold
+    threshold = 7
+    short_multi_fac_conversations = (
+        multi_fac_turns.groupby("conversation_id")["SpeakerTurn"]
+        .max()
+        .reset_index()
+    )
+    short_multi_fac_conversations = short_multi_fac_conversations[
+        short_multi_fac_conversations["SpeakerTurn"] < threshold
+    ]["conversation_id"]
+
+    # Handle single-facilitator conversations
+    single_fac_conversations = fac_counts[fac_counts["fac_count"] == 1]["conversation_id"]
+    single_fac_turns = is_fac_turns[is_fac_turns["conversation_id"].isin(single_fac_conversations)]
+    short_single_fac_conversations = single_fac_turns[
+        single_fac_turns["SpeakerTurn"] < threshold
+    ]["conversation_id"]
+
+    # Redact conversations: drop if single facilitator is below the threshold,
+    # or if all facilitators in multi-facilitator conversations are below the threshold
+    redact_conversations = set(short_single_fac_conversations).union(
+        set(short_multi_fac_conversations)
+    )
+    df = df[~df["conversation_id"].isin(redact_conversations)]
+
+    # For multi-facilitator conversations: if one facilitator is above the threshold,
+    # set is_fac = False for those below the threshold
+    if not multi_fac_turns.empty:
+        to_update = multi_fac_turns[
+            multi_fac_turns["SpeakerTurn"] < threshold
+        ]
+        to_update = to_update[~to_update["conversation_id"].isin(short_multi_fac_conversations)]
+
+        for _, row in to_update.iterrows():
+            df.loc[
+                (df["conversation_id"] == row["conversation_id"]) &
+                (df["speaker_name"] == row["speaker_name"]),
+                "is_fac"
+            ] = False
+    
     df["speaker_name"] = df["speaker_name"].str.lower().str.strip()
     df["speaker_name"] = df["speaker_name"].str.replace(r"\[.*\]", "", regex=True)
     df = df[
@@ -220,6 +289,15 @@ def conversational_structure(df):
     final = final.dropna(subset=["facilitators"])
     final = final.drop(columns=["is_fac_y", "is_fac_x"])
     
+    # plot correlation matrix
+    # Exclude non-numeric columns
+    numeric_cols = final.select_dtypes(include=[np.number])
+    corr = numeric_cols.corr()
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(corr, annot=True, cmap='coolwarm')
+    plt.title("Correlation Matrix")
+    plt.show()
+    
     return final
 
 
@@ -227,7 +305,7 @@ if __name__ == "__main__":
     input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\data_llama70B_processed_output.pkl"
     print("Loading data")
     df = load_data(input_path)
-    # drop na in Latent-Attention_Embedding
+    # drop na in Latent-Attention_Embedding    
     df = df.dropna(subset=["Latent-Attention_Embedding"])
     df = prepare_data(df)
     cs = conversational_structure(df)
