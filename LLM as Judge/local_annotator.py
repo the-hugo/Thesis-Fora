@@ -1,10 +1,9 @@
-# script_local.py
-
 import torch
 import pandas as pd
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from tqdm import tqdm
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 
 def load_data(input_path):
@@ -13,10 +12,76 @@ def load_data(input_path):
     return df
 
 
+def classify_adherence_to_guide(df, model, tokenizer):
+    """
+    For each candidate pair (facilitator turn and guide snippet) in df,
+    this function prompts the LLM to rate the adherence on a scale from 0 to 1.
+    The LLM is expected to output only a numeric score.
+    """
+    # Add a new column for the LLM score if it doesn't exist yet.
+    if "llm_adherence_score" not in df.columns:
+        df["llm_adherence_score"] = 0.0
+
+    pbar = tqdm(total=len(df), desc="Classifying Adherence to Guide")
+
+    # Iterate row by row
+    for idx, row in df.iterrows():
+        turn_text = row["turn_text"]
+        guide_text = row["guide_text"]
+
+        # Construct a prompt that asks the LLM to rate adherence.
+        input_text_str = f"""Below you have a facilitator's turn from a conversation and a corresponding guide snippet.
+Facilitator Turn: "{turn_text}"
+Guide Snippet: "{guide_text}"
+On a scale from 0 to 1, where 1 means the turn fully adheres to the guide snippet and 0 means it does not adhere at all, please provide only a numeric score.
+Answer:"""
+
+        inputs = tokenizer(
+            [input_text_str],
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+        with torch.no_grad():
+            output = model.generate(
+                inputs["input_ids"],
+                attention_mask=inputs["attention_mask"],
+                max_new_tokens=16,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+
+        output_sequences = output[:, inputs["input_ids"].shape[-1]:]  # Exclude prompt tokens
+        response = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
+        response_text = response[0].strip()
+
+        # Attempt to extract a float value from the LLM response
+        try:
+            score = float(response_text.split()[0])
+        except Exception as e:
+            score = 0.0  # default in case of an error
+            print(f"Error parsing LLM response at index {idx}: '{response_text}' -> {e}")
+
+        df.at[idx, "llm_adherence_score"] = score
+        pbar.update(1)
+    pbar.close()
+    return df
+
+
+def filter_by_llm_score(df):
+    """
+    For each guide snippet (per conversation), keep only the candidate with the highest LLM adherence score.
+    """
+    # Group by conversation and guide snippet (or guide_segment) and take the row with maximum LLM score.
+    filtered_df = df.loc[df.groupby(["conversation_id", "guide_segment"])["llm_adherence_score"].idxmax()]
+    return filtered_df
+
+
 def classify_personal_sharing(df, model, tokenizer):
     """
     This function processes a DataFrame to classify personal sharing in conversation turns.
-    Using only Model 1 here.
+    This uses Model 1 (SmolLM).
     """
     results = []
     grouped = df.groupby("conversation_id")
@@ -27,7 +92,6 @@ def classify_personal_sharing(df, model, tokenizer):
         for i in range(2, len(turns)):  # Start at index 2 (SpeakerTurn = 3)
             target_turn = turns.iloc[i]
 
-            # Basic checks
             if target_turn["words"] is None:
                 continue
             if target_turn["SpeakerTurn"] == turns["SpeakerTurn"].max():
@@ -36,10 +100,9 @@ def classify_personal_sharing(df, model, tokenizer):
             if word_count < 5:
                 continue
 
-            context_turn_1 = turns.iloc[i - 2]  # Second preceding turn
-            context_turn_2 = turns.iloc[i - 1]  # Immediately preceding turn
+            context_turn_1 = turns.iloc[i - 2]
+            context_turn_2 = turns.iloc[i - 1]
 
-            # Prepare the prompt
             input_text_str = f"""You will be presented with text in a TARGET TURN from a speaker turn from a transcribed spoken conversation. The text was spoken by a participant in a conversation. We are identifying instances of personal sharing by the speaker. Your job is to identify the following sharing types in the quote:
  - Personal story - Personal experience
 These are types of sharing that are only sometimes used. Many of the quotes will not contain either, and some will contain both. The definitions are important to make sure they actually apply.
@@ -61,7 +124,6 @@ Do not output any explanation, just output a comma-separated list of any that ap
 If none apply, output "None". Answer:
 """
 
-            # Tokenize
             inputs = tokenizer(
                 [input_text_str],
                 return_tensors="pt",
@@ -70,38 +132,59 @@ If none apply, output "None". Answer:
             )
 
             with torch.no_grad():
-                # Move inputs to the same device as the model
+                # Move inputs to the same device as Model 1
                 inputs = {k: v.to(model.device) for k, v in inputs.items()}
                 output = model.generate(
                     inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
-                    max_new_tokens=128,  # shortened for local usage
+                    max_new_tokens=128,
                     pad_token_id=tokenizer.eos_token_id,
                 )
 
             response = tokenizer.batch_decode(output, skip_special_tokens=True)
-            # You can parse `response` further if needed. For now, just store it:
             results.append((conversation_id, target_turn["SpeakerTurn"], response[0]))
-            print(response[0])
-            print(target_turn["SpeakerTurn"])
+
     return results
 
 
-def classify_speech_acts(df, model, tokenizer):
-    # Stub for your speech-act classification (unused in this example).
-    pass
-
-
-def add_classification(df, model, tokenizer, var):
+def classify_speech_acts(df, pipeline_2):
     """
-    var can be: "speech acts", "personal_sharing", "adherence_to_guide"
+    Example function that uses Model 2 (phi-4) via a pipeline to do something.
+    In a real scenario, you’d adapt the prompt or approach to your actual classification needs.
+    """
+    results = []
+    grouped = df.groupby("conversation_id")
+
+    for conversation_id, turns in grouped:
+        # Minimal usage example: take the last user turn and generate something
+        # (You should tailor this logic to your actual speech-acts classification.)
+        if len(turns) == 0:
+            continue
+
+        # For demonstration: we pass a short prompt to pipeline_2
+        example_message = [
+            {"role": "system", "content": "You are a medieval knight analyzing modern conversation."},
+            {"role": "user", "content": f"Please classify the speech acts in: '{turns.iloc[-1]['words']}'."}
+        ]
+        output = pipeline_2(example_message, max_new_tokens=64)
+        # The pipeline returns a list of dicts. We'll just keep the text here:
+        gen_text = output[0]["generated_text"]
+        results.append((conversation_id, gen_text))
+
+    return results
+
+
+def add_classification(df, model_1, tokenizer_1, pipeline_2, var):
+    """
+    Modified so that it can accept both Model 1 and pipeline_2.
     """
     if var == "speech acts":
-        classify_speech_acts(df, model, tokenizer)
-    if var == "personal_sharing":
-        classify_personal_sharing(df, model, tokenizer)
-    if var == "adherence_to_guide":
-        classify_personal_sharing(df, model, tokenizer)  # or another function
+        classify_speech_acts(df, pipeline_2)
+    elif var == "personal_sharing":
+        classify_personal_sharing(df, model_1, tokenizer_1)
+    elif var == "adherence_to_guide":
+        # Just re-using the personal_sharing function as a placeholder
+        classify_personal_sharing(df, model_1, tokenizer_1)
 
     return df
 
@@ -113,71 +196,36 @@ def preprocess_data(df):
 
 
 if __name__ == "__main__":
+    # Paths can be adjusted as needed.
+    # (For adherence classification, we expect the CSV produced by the first script.)
+    adherence_input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\adherence_results_threshold_0.4.csv"
+    print(f"Loading adherence mapping data from: {adherence_input_path}")
+    adherence_df = pd.read_csv(adherence_input_path)
 
-    # -------------------------------------------------------------------------
-    # Example argument parsing or manual paths (adjust to your local paths)
-    # -------------------------------------------------------------------------
-    # if len(sys.argv) == 1:
-    #     print("No path provided. Using default paths.")
-    #     output_path = "/path/to/output.pkl"
-    #     input_path = "/path/to/data_nv-embed_processed_output.pkl"
-    # else:
-    #     input_path = sys.argv[1]
-    #     output_path = sys.argv[2]
-
-    # For demonstration, setting local path:
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\embeddings\data_nv-embed_processed_output.pkl"
-    print(f"Input path: {input_path}")
-
-    # -------------------------------------------------------------------------
-    # Load Model 1 (SmolLM) - CPU by default
-    # -------------------------------------------------------------------------
     print("Loading Model 1 (SmolLM)...")
     checkpoint = "HuggingFaceTB/SmolLM-1.7B-Instruct"
-    device = "cpu"  # or "cuda" if you want GPU locally
+    device = "cpu"  # Change to "cuda" if available.
     tokenizer = AutoTokenizer.from_pretrained(checkpoint)
     model = AutoModelForCausalLM.from_pretrained(checkpoint).to(device)
     print("Model 1 loaded.")
 
-    # -------------------------------------------------------------------------
-    # Load data
-    # -------------------------------------------------------------------------
-    print("Loading data...")
-    df = load_data(input_path)
-    print("Done loading data.")
+    # --- New: Classify adherence to guide ---
+    print("Classifying adherence to guide with LLM...")
+    adherence_df = classify_adherence_to_guide(adherence_df, model, tokenizer)
+    print("Filtering candidates to keep only the highest LLM score per conversation and guide segment...")
+    adherence_df_filtered = filter_by_llm_score(adherence_df)
+    adherence_output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\adherence_results_classified.csv"
+    adherence_df_filtered.to_csv(adherence_output_path, index=False)
+    print(f"Classified adherence results saved to {adherence_output_path}")
 
-    # -------------------------------------------------------------------------
-    # Preprocess
-    # -------------------------------------------------------------------------
-    print("Preprocessing...")
-    participants_df, facilitators_df = preprocess_data(df)
-    print("Done preprocessing.")
-
-    # -------------------------------------------------------------------------
-    # Classify personal sharing (example usage)
-    # -------------------------------------------------------------------------
-    print("Classifying personal sharing...")
-    df = add_classification(df, model, tokenizer, "personal_sharing")
-    print("Done")
-
-    # -------------------------------------------------------------------------
-    # Classify adherence_to_guide (example usage)
-    # -------------------------------------------------------------------------
-    print("Classifying adherence_to_guide...")
-    df = add_classification(facilitators_df, model, tokenizer, "adherence_to_guide")
-    print("Done")
-
-    # -------------------------------------------------------------------------
-    # Classify speech acts (example usage)
-    # -------------------------------------------------------------------------
+    # (The rest of your original script—for example, classifying speech acts or personal sharing—can remain as is.)
     print("Classifying speech acts...")
-    df = add_classification(facilitators_df, model, tokenizer, "speech acts")
-    print("Done")
-
-    # -------------------------------------------------------------------------
-    # Save results (commented out for demonstration)
-    # -------------------------------------------------------------------------
-    # df.to_pickle(output_path)
-    # print(f"Final DataFrame saved to {output_path}")
+    # Assuming you want to process facilitators for speech acts:
+    data_input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\embeddings\data_nv-embed_processed_output.pkl"
+    df = load_data(data_input_path)
+    _, facilitators_df = preprocess_data(df)
+    facilitators_df = add_classification(facilitators_df, model, tokenizer, "speech acts")
+    # Save or further process facilitators_df as needed.
+    print("Speech acts classification done.")
 
     print("All tasks completed.")
