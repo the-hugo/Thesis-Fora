@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import re
 
+
 def compute_adherence(conversations, guides, threshold=0.4):
     """
     Computes similarity scores between every facilitator's turn and every guide segment.
@@ -13,7 +14,9 @@ def compute_adherence(conversations, guides, threshold=0.4):
     results = []
 
     # Compute speaker turn indices (each conversation has one facilitator)
-    conversations["SpeakerTurn"] = conversations.groupby(["conversation_id", "speaker_name"]).cumcount() + 1
+    # conversations["SpeakerTurn"] = (
+    #     conversations.groupby(["conversation_id", "speaker_name"]).cumcount() + 1
+    # )
 
     # Process each conversation (by collection_id)
     for collection_id, conversation_group in conversations.groupby("collection_id"):
@@ -43,18 +46,21 @@ def compute_adherence(conversations, guides, threshold=0.4):
             # Retain only those guide segments where similarity > threshold (0.4)
             for idx, score in enumerate(similarity_scores):
                 if score > threshold:
-                    results.append({
-                        "collection_id": collection_id,
-                        "speaker_name": speaker,
-                        "conversation_id": conversation_id,
-                        "SpeakerTurn": speaker_turn,
-                        "turn_text": turn_text,
-                        "guide_segment": guide_segments[idx],
-                        "guide_text": guide_texts[idx],
-                        "similarity_score": score,
-                    })
+                    results.append(
+                        {
+                            "collection_id": collection_id,
+                            "speaker_name": speaker,
+                            "conversation_id": conversation_id,
+                            "SpeakerTurn": speaker_turn,
+                            "turn_text": turn_text,
+                            "guide_segment": guide_segments[idx],
+                            "guide_text": guide_texts[idx],
+                            "similarity_score": score,
+                        }
+                    )
 
     return pd.DataFrame(results)
+
 
 def prepare_conversational_data(df):
     """
@@ -63,6 +69,7 @@ def prepare_conversational_data(df):
     df = df.dropna(subset=["Latent-Attention_Embedding"])
     df = df[df["is_fac"] == True]
     return df
+
 
 # (Optionally, you may update or remove other functions that no longer apply.)
 
@@ -81,7 +88,7 @@ if __name__ == "__main__":
     # Compute adherence mappings (only retaining pairs above 0.4 similarity)
     print("Computing adherence mappings (similarity threshold = 0.4)...")
     adherence_results = compute_adherence(conversations, guide_df, threshold=0.4)
-    
+
     # Save the mapping so the LLM classification can work on these candidates
     output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\adherence_results_threshold_0.4.csv"
     adherence_results.to_csv(output_path, index=False)
