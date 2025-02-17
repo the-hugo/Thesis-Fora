@@ -13,7 +13,9 @@ def load_data(input_path):
 
 
 def calculate_correlation(df):
-
+    # kick out all non numeric columns
+    df = df.select_dtypes(include=["float64", "int64"])
+    
     correlation_matrix = df.corr()
 
     correlation_threshold = 0.15
@@ -56,41 +58,7 @@ def compute_ratios(group):
 
 def aggregate_conv(df, participants):
     # calculate the rate of Facilitator to Participant change. How often do the roles change in turn taking over all turn?
-    df = df.sort_values(by=["conversation_id", "SpeakerTurn"])
-
-    # Identify role changes (True if role changes between consecutive turns)
-    df["role_change"] = (
-        df.groupby("conversation_id")["is_fac"]
-        .apply(lambda x: x != x.shift(1))
-        .reset_index(level=0, drop=True)
-    )
-
-    # Count role changes per conversation
-    role_change_counts = (
-        df.groupby("conversation_id")["role_change"].sum().reset_index()
-    )
-    role_change_counts = role_change_counts.rename(
-        columns={"role_change": "role_change_count"}
-    )
-
-    # Total turns per conversation
-    total_turns = df.groupby("conversation_id")["SpeakerTurn"].count().reset_index()
-    total_turns = total_turns.rename(columns={"SpeakerTurn": "total_turns"})
-
-    # Merge counts and calculate the role change rate
-    role_change_rate_df = pd.merge(
-        role_change_counts, total_turns, on="conversation_id"
-    )
-    role_change_rate_df["role_change_rate"] = role_change_rate_df[
-        "role_change_count"
-    ] / (role_change_rate_df["total_turns"] - 1)
-
-    # merge the role_change_rate column to the main dataframe
-    df = pd.merge(
-        df,
-        role_change_rate_df[["conversation_id", "role_change_rate"]],
-        on="conversation_id",
-    )
+    df = df.sort_values(by=["conversation_id", "SpeakerTurn"])    
 
     # kick out all non-facilitator rows
     n_participants = not participants
@@ -131,7 +99,8 @@ def aggregate_conv(df, participants):
         "phatic speech",
         "words",  # Add preserved columns here since they will also be dropped
         "Latent-Attention_Embedding",
-        "Segments" "Express affirmation",
+        "Segment",
+        "Express affirmation",
         "Specific invitation",
         "Provide example",
         "Open invitation",
@@ -152,9 +121,9 @@ def aggregate_conv(df, participants):
         "phaticity ratio": "mean",
         "Rd": "first",
         "Rc": "first",
-        "role_change_rate": "first",
         "Personal story": "sum",
         "Personal experience": "sum",
+        "avg_llm_adherence_score": "mean"
     }
 
     # Add default aggregation (mean) for all other numeric columns except grouping keys
@@ -180,20 +149,27 @@ def aggregate_conv(df, participants):
 
 if __name__ == "__main__":
     df = load_data(
-        r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\LIWC-22 Results - data_llama70B_processed_output___ - LIWC Analysis_big.csv"
+        r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\LLM as Judge\final.csv"
     )
     df = df.groupby("conversation_id").apply(compute_ratios).reset_index(drop=True)
 
-    participants = False
+    participants = True
     df = aggregate_conv(df, participants)
 
-    # calculate_correlation(df)
+    #calculate_correlation(df)
 
     if participants:
+        # kick out rows with conversation id 2361 and 2227
+        df = df[df["conversation_id"] != 2361]
+        df = df[df["conversation_id"] != 2227]
+        # kick out the entire column
+        df = df.drop(columns=["avg_llm_adherence_score"])
         df.to_csv(
             r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_big.csv"
         )
     else:
+        # rename avg_llm_adherence_score to adherence_to_guide
+        df.rename(columns={"avg_llm_adherence_score": "adherence_to_guide"}, inplace=True)
         df.to_csv(
             r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
         )

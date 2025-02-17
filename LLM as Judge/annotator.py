@@ -104,7 +104,7 @@ def parse_numeric_response(response: str, idx) -> float:
     If no such number is found, returns 0.0 and prints an error message.
     """
     response_text = response.strip()
-    #print(response_text)
+    # print(response_text)
     match = re.search(r"Answer:\s*(\d+(?:\.\d+)?)", response_text)
     if match:
         return float(match.group(1))
@@ -129,15 +129,17 @@ def filter_by_llm_score(df: pd.DataFrame) -> pd.DataFrame:
     return the row with the highest similarity_score.
     Otherwise, return the row with the highest llm_adherence_score.
     """
+
     def select_row(group):
         if (group["llm_adherence_score"] == 0).all():
             return group.loc[group["similarity_score"].idxmax()]
         else:
             return group.loc[group["llm_adherence_score"].idxmax()]
 
-    filtered_df = df.groupby(["conversation_id", "guide_text"], group_keys=False).apply(select_row)
+    filtered_df = df.groupby(["conversation_id", "guide_text"], group_keys=False).apply(
+        select_row
+    )
     return filtered_df
-
 
 
 def preprocess_data(df: pd.DataFrame):
@@ -373,12 +375,12 @@ def classify_speech_acts(df: pd.DataFrame, batch_size=4) -> pd.DataFrame:
                     or len(target_turn["words"].split()) < 5
                 ):
                     continue
+
                 target_turn_text = target_turn["words"]
                 pbar.update(1)
-                context_turn_1 = turns.iloc[i - 2]
-                context_turn_2 = turns.iloc[i - 1]
-                context_turn_1 = context_turn_1["words"]
-                context_turn_2 = context_turn_2["words"]
+                context_turn_1 = turns.iloc[i - 2]["words"]
+                context_turn_2 = turns.iloc[i - 1]["words"]
+
                 input_text_str = f"""You are an assistant tasked with classifying a participant’s speech in a transcribed conversation. Your goal is to identify which of the following speech acts are present in the TARGET TURN:
 
 - **Express affirmation:** Indicates agreement, support, or understanding of another’s statement.
@@ -393,14 +395,66 @@ Instructions:
 4. If no speech acts apply, simply output "None".
 5. Do not include any explanation.
 
+Examples:
+
+**Example 1**  
+CONTEXT TURN: I'm ready to go next.  
+CONTEXT TURN: I thought I just gave my answer.  
+TARGET TURN: Oh ok, thanks for sharing your story. I agree with what you’re saying about the city planning. I was going to encourage us to share ideas on that next.  
+**Answer:** Express affirmation, Express appreciation
+
+**Example 2**  
+CONTEXT TURN: Do you mind if we move on?  
+CONTEXT TURN: Ok sure, I can hold off until others share.  
+TARGET TURN: Thanks. I’m trying to make sure we share time.  
+**Answer:** Express appreciation
+
+**Example 3**  
+CONTEXT TURN: Ok. What do you think?  
+CONTEXT TURN: Yeah. The public pools are too crowded and I wish we had a better management system.  
+TARGET TURN: Definitely. I hear that. How about you, Sandy?  
+**Answer:** Express affirmation
+
+**Example 4**  
+CONTEXT TURN: Wendy, you're on mute now.  
+CONTEXT TURN: Ok, sorry, but it's your turn.  
+TARGET TURN: No, I thought it was your turn? Sorry, I'm confused.  
+**Answer:** None
+
+**Example 5**  
+CONTEXT TURN: I'm ready to go next.  
+CONTEXT TURN: I thought I just gave my answer.  
+TARGET TURN: Oh ok, thanks for sharing your story. I agree with what you’re saying about the city planning. I was going to encourage us to share ideas on that next. Does anyone else want to share?  
+**Answer:** Open invitation to participate
+
+**Example 6**  
+CONTEXT TURN: Do you mind if we move on?  
+CONTEXT TURN: Ok sure, I can hold off until others share.  
+TARGET TURN: Thanks. I’m trying to make sure we share time. Sally, will you be ready to go next?  
+**Answer:** Specific invitation to participate
+
+**Example 7**  
+CONTEXT TURN: Ok. What do you think?  
+CONTEXT TURN: Yeah. The public pools are too crowded and I wish we had a better management system.  
+TARGET TURN: Definitely. I hear that. How about you, Sandy? Or does anyone else want to go? The floor is open.  
+**Answer:** Open invitation to participate, Specific invitation to participate
+
+**Example 8**  
+CONTEXT TURN: Are you able to expand more on that?  
+CONTEXT TURN: Give me a second.  
+TARGET TURN: Great. We will wait. Let us know when you are ready.  
+**Answer:** Specific invitation to participate
+
 Conversation for Classification:
 
 CONTEXT TURN: {context_turn_1} 
 CONTEXT TURN: {context_turn_2} 
 TARGET TURN: {target_turn_text}  
 
-**Identify the applicable speech acts in the TARGET TURN according to the definitions above.**  
-Output only a comma-separated list of applicable speech acts. If none apply, output "None". Do not provide any explanations."""
+**Identify the applicable speech acts in the TARGET TURN according to the definitions above.**
+Output only a comma-separated list of applicable speech acts. If none apply, output "None". Do not provide any explanations.
+
+Answer:"""
 
                 inputs = tokenizer(
                     [input_text_str],
@@ -416,17 +470,16 @@ Output only a comma-separated list of applicable speech acts. If none apply, out
                         max_new_tokens=128,
                         pad_token_id=tokenizer.eos_token_id,
                     )
-                # Exclude input tokens.
-                # output_sequences = output[:, inputs["input_ids"].shape[-1] :]
-                # response = tokenizer.batch_decode(
-                #     output_sequences, skip_special_tokens=True
-                # )
                 response = tokenizer.batch_decode(output, skip_special_tokens=True)
-                print("Full LLM response:", response)
+                #print("Full LLM response:", response)
 
-                classification = response[0].strip()
-                # print(f"LLM response: {classification}")
-                # Locate the corresponding row in the DataFrame.
+                full_response = response[0].strip()
+                # Extract only the answer portion after "Answer:"
+                if "Answer:" in full_response:
+                    classification = full_response.split("Answer:")[-1].strip()
+                else:
+                    classification = full_response
+
                 idx = df.index[
                     (df["conversation_id"] == conversation_id)
                     & (df["SpeakerTurn"] == target_turn["SpeakerTurn"])
@@ -434,25 +487,17 @@ Output only a comma-separated list of applicable speech acts. If none apply, out
                 if len(idx) == 1:
                     row_idx = idx[0]
                     df.at[row_idx, "speech_acts_result"] = classification
-                    # Reset and set flags based on the response.
-                    df.at[row_idx, "express_appreciation"] = (
-                        1 if "appreciation" in classification.lower() else 0
-                    )
-                    df.at[row_idx, "express_affirmation"] = (
-                        1 if "affirmation" in classification.lower() else 0
-                    )
-                    df.at[row_idx, "open_invitation"] = (
-                        1 if "open" in classification.lower() else 0
-                    )
-                    df.at[row_idx, "specific_invitation"] = (
-                        1 if "specific" in classification.lower() else 0
-                    )
+                    df.at[row_idx, "express_appreciation"] = 1 if "appreciation" in classification.lower() else 0
+                    df.at[row_idx, "express_affirmation"] = 1 if "affirmation" in classification.lower() else 0
+                    df.at[row_idx, "open_invitation"] = 1 if "open" in classification.lower() else 0
+                    df.at[row_idx, "specific_invitation"] = 1 if "specific" in classification.lower() else 0
     except Exception as e:
         print(f"Error processing conversation {conversation_id}: {e}", flush=True)
     finally:
         pbar.close()
 
     return df
+
 
 
 def add_classification(df: pd.DataFrame, var: str, batch_size=4):
@@ -484,36 +529,44 @@ def main():
     adherence_input_path = "/home/ra37qax/adherence_results_threshold_0.4.csv"
     print(f"Loading adherence mapping data from: {adherence_input_path}")
     adherence_df = pd.read_csv(adherence_input_path)
-    adherence_df = adherence_df.sample(frac=0.1)
+    #adherence_df = adherence_df.sample(frac=0.1)
     print("Classifying adherence to guide with the new LLM...")
     adherence_df = classify_adherence_to_guide(adherence_df, batch_size=4)
     # save the results
     adherence_df.to_csv(adherence_input_path, index=False)
-    
-    print("Filtering candidates to keep only the highest LLM score per conversation and guide segment...")
+
+    print(
+        "Filtering candidates to keep only the highest LLM score per conversation and guide segment..."
+    )
     adherence_df_filtered = filter_by_llm_score(adherence_df)
 
     adherence_output_csv = "/home/ra37qax/adherence_results_classified.csv"
     adherence_output_pkl = "/home/ra37qax/adherence_results_classified.pkl"
     adherence_df_filtered.to_csv(adherence_output_csv, index=False)
     adherence_df_filtered.to_pickle(adherence_output_pkl)
-    print(f"Classified adherence results saved to {adherence_output_csv} and {adherence_output_pkl}")
+    print(
+        f"Classified adherence results saved to {adherence_output_csv} and {adherence_output_pkl}"
+    )
 
     # --- Speech Acts and Personal Sharing Classification ---
     print("Classifying speech acts and personal sharing...")
     data_input_path = "/home/ra37qax/data_nv-embed_processed_output.pkl"
     df = load_data(data_input_path)
     participants_df, facilitators_df = preprocess_data(df)
-    facilitators_df = facilitators_df.sample(frac=0.1)
+    #facilitators_df = facilitators_df.sample(frac=0.1)
     # For speech acts, we classify only facilitator turns.
-    speech_acts_df = add_classification(facilitators_df.copy(), "speech acts", batch_size=4)
+    speech_acts_df = add_classification(
+        facilitators_df.copy(), "speech acts", batch_size=4
+    )
 
     speech_acts_csv_path = "/home/ra37qax/speech_acts_classification.csv"
     speech_acts_pkl_path = "/home/ra37qax/speech_acts_classification.pkl"
     speech_acts_df.to_csv(speech_acts_csv_path, index=False)
     speech_acts_df.to_pickle(speech_acts_pkl_path)
-    print(f"Speech acts classification results saved to {speech_acts_csv_path} and {speech_acts_pkl_path}")
-    df = df.sample(frac=0.1)
+    print(
+        f"Speech acts classification results saved to {speech_acts_csv_path} and {speech_acts_pkl_path}"
+    )
+    #df = df.sample(frac=0.1)
     # Personal sharing classification on the entire dataset.
     personal_sharing_results = classify_personal_sharing(df, batch_size=4)
     personal_sharing_df = pd.DataFrame(
@@ -548,7 +601,9 @@ def main():
         on=["conversation_id", "SpeakerTurn"],
         how="left",
     )
-    df_final["personal_sharing_result"] = df_final["personal_sharing_result"].fillna("None")
+    df_final["personal_sharing_result"] = df_final["personal_sharing_result"].fillna(
+        "None"
+    )
 
     output_csv = "/home/ra37qax/speech_acts_personal_sharing_classification.csv"
     output_pkl = "/home/ra37qax/speech_acts_personal_sharing_classification.pkl"

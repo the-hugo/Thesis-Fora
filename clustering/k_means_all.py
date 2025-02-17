@@ -148,7 +148,7 @@ def prepare_data(df):
             #"duration",
             #"Rd",
             #"Rc",
-            #"Personal story",
+            "Personal story",
             #"Personal experience",
             "QMark",
             #"Validation Strategies",

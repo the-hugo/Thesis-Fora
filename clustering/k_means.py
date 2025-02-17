@@ -172,22 +172,22 @@ def prepare_data(df):
             "Tone",
             #"WPS",
             #"duration",
-            "Rd",
-            "Rc",
-            #"Personal story",
-            #"Personal experience",
+            #"Rd",
+            #"Rc",
+            "Personal story",
+            "Personal experience",
             #"QMark",
             #"Validation Strategies",
             #"Invitations to Participate",
             #"Facilitation Strategies",
             "Cognition",
-            "Social",
+            #"Social",
             "Responsivity",
             #"fac_to_part_ratio",
             #"participant_semantic_speed",
-            "facilitator_semantic_speed",
+            #"facilitator_semantic_speed",
             #"role_change_rate",
-            "adherence_to_guide"
+            #"adherence_to_guide"
         ]
     else:
         features = df.columns.difference(
