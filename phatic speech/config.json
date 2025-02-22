@@ -2,7 +2,7 @@
   "model": "nv-embed",
   "aggregate_on_collection": false,
   "show_only": "facilitators",
-  "aggregate_embeddings": true,
+  "aggregate_embeddings": false,
   "truncate_turns": false,
   "collection_name": "corpus_data",
   "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/annotated/data_llama70B_processed_output_phatic_ratio.pkl",

@@ -9,7 +9,7 @@ import re
 from scipy.stats.mstats import winsorize
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import matplotlib.pyplot as plt
-
+from sklearn.decomposition import PCA  # <-- Added for PCA
 
 def load_data(input_path):
     """Load data from a pickle file."""
@@ -138,10 +138,9 @@ def k_means(df, n_clusters):
     preserved_columns = df[["conversation_id", "speaker_name"]].reset_index(drop=True)
     df = df.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
 
-    # Use UMAP features only for clustering
-    umap_features = df.columns
+    # Use all numeric features for clustering (UMAP features will be added later)
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    df["cluster"] = kmeans.fit_predict(df[umap_features])
+    df["cluster"] = kmeans.fit_predict(df)
     centroids = kmeans.cluster_centers_
     show_centroids(centroids, df, n_clusters)
 
@@ -170,31 +169,31 @@ def prepare_data(df):
             "Clout",
             "Authentic",
             "Tone",
-            #"WPS",
-            #"duration",
-            #"Rd",
-            #"Rc",
+            # "WPS",
+            # "duration",
+            # "Rd",
+            # "Rc",
             "Personal story",
             "Personal experience",
-            #"QMark",
-            #"Validation Strategies",
-            #"Invitations to Participate",
-            #"Facilitation Strategies",
+            # "QMark",
+            # "Validation Strategies",
+            # "Invitations to Participate",
+            # "Facilitation Strategies",
             "Cognition",
-            #"Social",
+            # "Social",
             "Responsivity",
-            #"fac_to_part_ratio",
-            #"participant_semantic_speed",
-            #"facilitator_semantic_speed",
-            #"role_change_rate",
-            #"adherence_to_guide"
+            # "fac_to_part_ratio",
+            # "participant_semantic_speed",
+            # "facilitator_semantic_speed",
+            # "role_change_rate",
+            # "adherence_to_guide"
         ]
     else:
         features = df.columns.difference(
             ["Unnamed: 0", "conversation_id", "speaker_name"]
         )
 
-    # plot a correlation matrix
+    # Plot a correlation matrix
     correlation_matrix = df[features].corr()
     plt.figure(figsize=(12, 6))
     plt.title("Correlation Matrix")
@@ -295,8 +294,9 @@ def show_centroids(centroids, df, n_clusters):
     for cluster_idx in range(n_clusters):
         plt.figure(figsize=(12, 6))
         deviations = centroids_df.iloc[cluster_idx] - feature_means
-        # exclude cluster from deviations
-        deviations = deviations[deviations.index != "cluster"]
+        # Exclude cluster from deviations
+        if "cluster" in deviations.index:
+            deviations = deviations.drop("cluster")
         deviations.plot(kind="bar", color="skyblue", edgecolor="black")
         plt.axhline(0, color="gray", linestyle="--")
         plt.title(f"Cluster {cluster_idx} Feature Deviations from Mean")
@@ -308,6 +308,57 @@ def show_centroids(centroids, df, n_clusters):
     return centroids_df
 
 
+# -----------------------------
+# New PCA Functions for Feature Analysis
+# -----------------------------
+
+def pca_analysis_overall(df, feature_columns=None, n_components=2):
+    """
+    Perform PCA on the dataset to determine the contribution of each feature.
+    If feature_columns is not provided, it will exclude 'conversation_id', 'speaker_name', 'cluster', and any UMAP columns.
+    """
+    if feature_columns is None:
+        exclude = {"conversation_id", "speaker_name", "cluster"}
+        feature_columns = [col for col in df.columns if col not in exclude and not col.startswith("umap_")]
+    
+    # Standardize the features
+    scaled_data = StandardScaler().fit_transform(df[feature_columns])
+    pca = PCA(n_components=n_components)
+    principal_components = pca.fit_transform(scaled_data)
+    
+    # Create a DataFrame for the PCA scores
+    pc_df = pd.DataFrame(data=principal_components, columns=[f"PC{i+1}" for i in range(n_components)])
+    if "cluster" in df.columns:
+        pc_df["cluster"] = df["cluster"].values
+    
+    explained_variance = pca.explained_variance_ratio_
+    loadings = pd.DataFrame(
+        pca.components_.T, 
+        columns=[f"PC{i+1}" for i in range(n_components)], 
+        index=feature_columns
+    )
+    
+    print("Explained Variance Ratio:", explained_variance)
+    print("PCA Loadings (feature contributions to each PC):\n", loadings)
+    return pca, pc_df, loadings, explained_variance
+
+
+def plot_pca_scores(pc_df):
+    """Plot the first two PCA components, coloring points by cluster."""
+    fig = px.scatter(
+        pc_df, 
+        x="PC1", 
+        y="PC2", 
+        color="cluster", 
+        title="PCA Scatter Plot by Cluster",
+        labels={"PC1": "Principal Component 1", "PC2": "Principal Component 2"}
+    )
+    fig.show()
+
+
+# -----------------------------
+# Main Script Execution
+# -----------------------------
 if __name__ == "__main__":
     input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
     print("Loading data")
@@ -330,12 +381,18 @@ if __name__ == "__main__":
     print("Applying UMAP to all features")
     df = preprocessing(df)
 
-    # exclude non-numeric columns
+    # Exclude non-numeric columns for clustering
     df_n = df.drop(columns=["conversation_id", "speaker_name"])
     n_clusters = determine_cluster(df_n)
 
     print("K-means clustering")
     df = k_means(df, n_clusters)
+
+    # --- PCA Analysis added here ---
+    print("Performing PCA for feature importance analysis")
+    pca, pc_df, loadings, explained_variance = pca_analysis_overall(df)
+    plot_pca_scores(pc_df)
+    # ---------------------------------
 
     df = apply_umap(df)
     plot_clusters(df)

@@ -142,7 +142,7 @@ class GlobalEmbeddingVisualizer:
         return conversation_info
 
     def compute_aggregated_embeddings(self):
-        self.df["speaker_name"] = self.df["speaker_name"].str.lower().str.strip()
+        self.df["speaker_name"] = self.df["speaker_name"].str.strip()
         self.df = self.df[
             ~self.df["speaker_name"].str.contains(
                 "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
@@ -210,7 +210,6 @@ class GlobalEmbeddingVisualizer:
         self.compute_aggregated_embeddings()
 
         embedding_2d = self.compute_umap(self.speaker_embeddings)
-
         self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
         self.speaker_embeddings["UMAP_2"] = embedding_2d[:, 1]
         self.speaker_embeddings["UMAP_3"] = embedding_2d[:, 2]
@@ -227,52 +226,61 @@ class GlobalEmbeddingVisualizer:
             "UMAP_3": False,
         }
 
-        """
-        # filter for certain collections, is_fac and speaker_names
-        collections = ['United Way of Dane County', 'Maine ED 2050', 'Engage 2020', 'Cambridge City Manager Selection Project']
-        speakers = ['mathias', 'paula', " ashley", " renee", "amparo", "walter", "brian", "naomie", "adrienne"]
-        self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['collection_title'].isin(collections)]
-        self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['is_fac'] == True]
-        self.speaker_embeddings = self.speaker_embeddings[self.speaker_embeddings['speaker_name'].isin(speakers)]
-        """
-
-        title = f'{self.model}: {"Aggregated" if self.aggregate_embeddings else "Individual"} {self.show_only.title()} Embeddings for {self.collection_name} at {level} Level'
-
-        # Determine the coloring mode based on 'color_by_role' parameter
+        # When color_by_role is active, update the legend to map symbols to roles.
         if self.color_by_role == "f_p":
-            color_column = "symbol"  # Use the mapped 'role' column
-            custom_color_palette = [
-                "#ffc600",
-                "#00a4eb",
-            ]  # Colors for Facilitator and Participant
-            legend_title = "Symbol"
+            # Map is_fac: True -> Facilitator, False -> Participant
+            self.speaker_embeddings["symbol"] = self.speaker_embeddings["is_fac"].apply(
+                lambda x: "Facilitator" if x else "Participant"
+            )
+            color_column = "symbol"  # Use the role labels for both color and symbol
+            custom_color_palette = ["#ffc600", "#00a4eb"]  # Colors for Facilitator and Participant
+            legend_title = "Role"
+            # Specify the symbol sequence explicitly so that:
+            # "Facilitator" (alphabetically first) gets a square, and
+            # "Participant" gets a circle.
+            symbol_sequence = ["diamond", "circle"]
         else:
             color_column = "collection_title"
-            custom_color_palette = (
-                self.custom_color_palette
-            )  # Use the collection palette
+            custom_color_palette = self.custom_color_palette
             legend_title = "Collection"
+            symbol_sequence = None  # No override if not coloring by role
 
-        # fix for how plotly assigns labels to the legend
-        df_sorted = self.speaker_embeddings.sort_values(
-            by=["symbol", "collection_title"]
-        )
+        # Sorting to help with legend ordering
+        df_sorted = self.speaker_embeddings.sort_values(by=["symbol", "collection_title"])
 
-        # Generate the figure with appropriate coloring based on the active mode
-        fig = px.scatter_3d(
-            df_sorted,
-            x="UMAP_1",
-            y="UMAP_2",
-            z="UMAP_3",
-            color=color_column,  # Dynamically set the color column
-            symbol="symbol",
-            title=title,
-            hover_name="speaker_name",
-            hover_data=hover_data,
-            color_discrete_sequence=custom_color_palette,  # Use appropriate color palette
-        )
+        # Set the diagram title as specified
+        title = "Aggregated Turn Embeddings on Conversational Level"
 
-        # Update the marker properties
+        # Create the 3D scatter plot.
+        # If we have a symbol sequence (in f_p mode), pass it in.
+        if symbol_sequence:
+            fig = px.scatter_3d(
+                df_sorted,
+                x="UMAP_1",
+                y="UMAP_2",
+                z="UMAP_3",
+                color=color_column,
+                symbol="symbol",
+                symbol_sequence=symbol_sequence,
+                title=title,
+                hover_name="speaker_name",
+                hover_data=hover_data,
+                color_discrete_sequence=custom_color_palette,
+            )
+        else:
+            fig = px.scatter_3d(
+                df_sorted,
+                x="UMAP_1",
+                y="UMAP_2",
+                z="UMAP_3",
+                color=color_column,
+                symbol="symbol",
+                title=title,
+                hover_name="speaker_name",
+                hover_data=hover_data,
+                color_discrete_sequence=custom_color_palette,
+            )
+
         fig.update_traces(
             marker=dict(
                 size=self.plot_marker_size,
@@ -289,37 +297,34 @@ class GlobalEmbeddingVisualizer:
             )
         )
 
-        # Update the legend title based on the coloring mode
+        # Update legend title and sizing
         fig.update_layout(
             legend_title_text=legend_title, legend=dict(itemsizing="constant")
         )
 
-        # Extract UMAP parameters
+        # Add UMAP parameter annotations
         neighbors = self.umap_params["n_neighbors"]
         metric = self.umap_params["metric"]
-
-        # Add annotations for UMAP parameters and settings
         fig.update_layout(
             annotations=[
                 dict(
                     text=f"Neighbors: {neighbors}<br>"
-                    f"Metric: {metric}<br>"
-                    f"Truncate Turns: {self.truncate_turns}<br>"
-                    f"Supervised: {self.supervised_umap_enabled}<br>"
-                    f"Label: {self.supervised_umap_label_column}",
-                    x=0,  # Center the subheading
-                    y=1,  # Slightly below the main title
+                        f"Metric: {metric}<br>"
+                        f"Truncate Turns: {self.truncate_turns}<br>"
+                        f"Supervised: {self.supervised_umap_enabled}<br>"
+                        f"Label: {self.supervised_umap_label_column}",
+                    x=0,
+                    y=1,
                     xref="paper",
                     yref="paper",
                     showarrow=False,
-                    font=dict(size=8),  # Adjust the font size for the subheading
-                    align="center",  # Align text to center
+                    font=dict(size=8),
+                    align="center",
                 )
             ]
         )
 
-        neighbors = str(self.umap_params["n_neighbors"])
-
+        neighbors_str = str(neighbors)
         final_output_path = (
             self.output_path_template
             + "umap_embeddings"
@@ -328,7 +333,7 @@ class GlobalEmbeddingVisualizer:
             + "_"
             + self.show_only
             + "_"
-            + neighbors
+            + neighbors_str
             + ".html"
         )
         fig.write_html(final_output_path)
@@ -336,6 +341,7 @@ class GlobalEmbeddingVisualizer:
         print(
             f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
         )
+
 
 
 # Usage

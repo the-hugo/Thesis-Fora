@@ -154,7 +154,7 @@ class GlobalEmbeddingVisualizer:
         ]
 
         # assign labels to the roles
-        symbols = {"Facilitator": "square", "Participant": "circle"}
+        symbols = {"Facilitator": "diamond", "Participant": "circle"}
         self.df["role"] = self.df["is_fac"].map(
             {True: "Facilitator", False: "Participant"}
         )
@@ -212,19 +212,18 @@ class GlobalEmbeddingVisualizer:
 
 
     def plot_aggregated(self):
-        
         """
-        Phatic Speech Part
-        """
-        
-        # remove all rows that have NaN in phaticity ratio
+    Phatic Speech Part (Continuous)
+    """
+    
+        # Remove rows with NaN in phaticity ratio.
         initial_count = len(self.df)
         self.df = self.df.dropna(subset=["phaticity ratio"])
         dropped_count = initial_count - len(self.df)
         print(f"Dropped {dropped_count} rows due to NaN values in 'phaticity ratio'")
         
-        # set a threshold. everything above 0.5 is rounded to 1, everything below is rounded to 0
-        self.df["phaticity ratio"] = self.df["phaticity ratio"].apply(lambda x: 1 if x >= 0.5 else 0)
+        # Do not threshold the phaticity ratio;
+        # keep its continuous value (assumed to be between 0 and 1)
         
         """
         End of Phatic Speech Part
@@ -247,44 +246,40 @@ class GlobalEmbeddingVisualizer:
             "UMAP_1": False,
             "UMAP_2": False,
             "UMAP_3": False,
+            "phaticity ratio": True,  # now included to see the continuous value
         }
 
-        title = f'{self.model}: {"Aggregated" if self.aggregate_embeddings else "Individual"} {self.show_only.title()} Embeddings for {self.collection_name} at {level} Level'
+        title = "Facilitator Turn Embeddings (Continuous Phaticity)"
 
-        # Set up coloring based on `phaticity ratio`, with NaN values represented in gray
+        # Sort dataframe for consistent ordering
         df_sorted = self.speaker_embeddings.sort_values(
             by=["symbol", "collection_title"]
         )
-
-        # Fill NaN phaticity ratios with a distinct value for color mapping (e.g., -1)
-        df_sorted["phaticity_color"] = df_sorted["phaticity ratio"].fillna(-1)
-
-        # Use Plotly's color_continuous_scale with a color range and NaN (gray) handling
+        
+        # Use a continuous color scale based on phaticity ratio.
+        # Here we create a custom scale that maps 0 to yellow and 1 to green.
         fig = px.scatter_3d(
             df_sorted,
             x="UMAP_1",
             y="UMAP_2",
             z="UMAP_3",
-            color="phaticity_color",
-            symbol="symbol",
+            color="phaticity ratio",
             title=title,
             hover_name="speaker_name",
             hover_data=hover_data,
-            color_continuous_scale=[
-            (0, "#ffc600"), (0.001, "#ffc600"), (1, "#00a4eb")
-            ],  # Gray for NaN, yellow for low, blue for high
-            range_color=[0, 1],  # Color range for phaticity ratio between 0 and 1
+            color_continuous_scale=[[0, "#ffc600"], [1, "#00B141"]]
         )
 
-        # Update marker properties
+        # Update marker properties: use circles and set the desired size and outline.
         fig.update_traces(
             marker=dict(
                 size=self.plot_marker_size,
                 line=dict(width=self.plot_marker_line_width, color="black"),
+                symbol="circle"
             )
         )
 
-        # Remove axis labels and tick markers
+        # Remove axis labels and tick markers.
         fig.update_layout(
             scene=dict(
                 xaxis=dict(title=None, showticklabels=False),
@@ -293,23 +288,20 @@ class GlobalEmbeddingVisualizer:
             )
         )
 
-        # Legend and annotations
+        # Add annotations with details on UMAP parameters.
         fig.update_layout(
-            legend_title_text="phaticity ratio",
-            annotations=[
-                dict(
-                    text=f"Neighbors: {self.umap_params['n_neighbors']}<br>"
-                        f"Metric: {self.umap_params['metric']}<br>"
-                        f"Truncate Turns: {self.truncate_turns}<br>"
-                        f"Supervised: {self.supervised_umap_enabled}<br>"
-                        f"Label: {self.supervised_umap_label_column}",
-                    x=0, y=1, xref="paper", yref="paper",
-                    showarrow=False, font=dict(size=8), align="center"
-                )
-            ]
+            annotations=[dict(
+                text=f"Neighbors: {self.umap_params['n_neighbors']}<br>"
+                    f"Metric: {self.umap_params['metric']}<br>"
+                    f"Truncate Turns: {self.truncate_turns}<br>"
+                    f"Supervised: {self.supervised_umap_enabled}<br>"
+                    f"Label: {self.supervised_umap_label_column}",
+                x=0, y=1, xref="paper", yref="paper",
+                showarrow=False, font=dict(size=8), align="center"
+            )]
         )
 
-        # Save and display the plot
+        # Save and display the plot.
         neighbors = str(self.umap_params["n_neighbors"])
         final_output_path = (
             self.output_path_template
@@ -327,6 +319,7 @@ class GlobalEmbeddingVisualizer:
         print(
             f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
         )
+
 
 
 
