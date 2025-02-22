@@ -24,4 +24,4 @@ merged_df = pd.merge(df2, df1_reduced, on=keys, how='outer')
 # Optional: Save the merged DataFrame to a new CSV file
 merged_df.to_csv("final.csv", index=False)
 
-print("Merge complete. Merged file saved at:", output_path)
+#print("Merge complete. Merged file saved at:", output_path)

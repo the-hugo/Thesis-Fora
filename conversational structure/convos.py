@@ -35,16 +35,15 @@ def gini_coefficient(values):
 
 def calculate_gini_coefficients(conversations):
     """
-    Calculates Gini coefficients for speaking time (Gd) and turn count (renamed as 
-    Equitable_turn_distribution) per conversation, excluding all facilitator turns 
-    (where is_fac is True).
+    Calculates Gini coefficients for speaking time (Gd) and turn count (Gc) per conversation, 
+    excluding all facilitator turns (where is_fac is True).
 
     Args:
         conversations (pd.core.groupby.generic.DataFrameGroupBy): GroupBy object with columns 
             `conversation_id`, `speaker_name`, `duration`, and `SpeakerTurn`.
 
     Returns:
-        pd.DataFrame: DataFrame with columns `conversation_id`, `Gd`, and `Equitable_turn_distribution`.
+        pd.DataFrame: DataFrame with columns `conversation_id`, `Gd`, and `Gc`.
     """
     gini_results = []
 
@@ -65,13 +64,13 @@ def calculate_gini_coefficients(conversations):
 
         # Calculate Gini coefficients
         Gd = gini_coefficient(duration_per_speaker)
-        equitable_turn_distribution = gini_coefficient(turns_per_speaker)
+        Gc = gini_coefficient(turns_per_speaker)
 
-        # Store results with the new naming for turn taking equity
+        # Store results with Gd and Gc
         gini_results.append({
             "conversation_id": conversation_id, 
             "Gd": Gd, 
-            "Equitable_turn_distribution": equitable_turn_distribution
+            "Gc": Gc
         })
 
     return pd.DataFrame(gini_results)
@@ -79,20 +78,19 @@ def calculate_gini_coefficients(conversations):
 
 def plot_gini_coefficients(gini_df):
     """
-    Plots the Gini coefficients (Gd for duration and Equitable_turn_distribution for turn count)
+    Plots the Gini coefficients (Gd for duration and Gc for turn count)
     for all conversations.
     
     Args:
-        gini_df (pd.DataFrame): DataFrame containing Gini coefficients with columns `Gd` and 
-                                `Equitable_turn_distribution`.
+        gini_df (pd.DataFrame): DataFrame containing Gini coefficients with columns `Gd` and `Gc`.
     """
     plt.figure(figsize=(10, 6))
-    plt.scatter(gini_df["Gd"], gini_df["Equitable_turn_distribution"], alpha=0.7, edgecolor="k")
+    plt.scatter(gini_df["Gd"], gini_df["Gc"], alpha=0.7, edgecolor="k")
     plt.axhline(0.5, color="red", linestyle="--", linewidth=0.8, label="Equity = 0.5")
     plt.axvline(0.5, color="blue", linestyle="--", linewidth=0.8)
     plt.title("Spread of Gini Coefficients (Duration and Turn Taking)", fontsize=14)
     plt.xlabel("Gd: Gini Coefficient for Duration", fontsize=12)
-    plt.ylabel("Equitable distribution in turn taking", fontsize=12)
+    plt.ylabel("Gc: Gini Coefficient for Turn Count", fontsize=12)
     plt.grid(alpha=0.3)
     plt.legend()
     plt.tight_layout()  # Adjust layout
@@ -187,20 +185,23 @@ def prepare_data(df):
 
 def conversational_structure(df):
     # Step 1: Calculate conversation-level metrics
+    # Grouping on the full dataframe for most metrics
     grouped = df.groupby("conversation_id")
+    
+    # Create a filtered dataframe excluding facilitator turns for counting turns
+    non_fac_df = df[~df["is_fac"]]
+    non_fac_grouped = non_fac_df.groupby("conversation_id")
+    
     metrics = pd.DataFrame({
         "num_speakers": grouped["speaker_name"].nunique(),
-        "num_turns": grouped.size(),
+        # Now num_turns counts only non-facilitator turns
+        "num_turns": non_fac_grouped.size(),
         "conversation_length": grouped["audio_end_offset"].max() - grouped["audio_start_offset"].min(),
-        "personal_sharing": grouped["Personal experience"].sum() + grouped["Personal story"].sum(),
-        "personal_experience": grouped["Personal experience"].sum(),
-        "personal_story": grouped["Personal story"].sum(),
+        "personal_sharing": non_fac_grouped["Personal experience"].sum() + non_fac_grouped["Personal story"].sum(),
+        "personal_experience": non_fac_grouped["Personal experience"].sum(),
+        "personal_story": non_fac_grouped["Personal story"].sum(),
     }).reset_index()
-
-    # Calculate Gini coefficients
-    iq = calculate_gini_coefficients(grouped)
-    metrics = metrics.merge(iq, on="conversation_id", how="left")
-
+    
     speaker_info = df[["conversation_id", "collection_id"]].drop_duplicates()
     
     # Create a column for facilitators and cofacilitators
@@ -208,7 +209,7 @@ def conversational_structure(df):
     facilitators.columns = ["conversation_id", "facilitators"]
     facilitators["is_fac"] = facilitators["facilitators"].apply(lambda x: len(x) > 0)
     facilitators["facilitators"] = facilitators["facilitators"].apply(lambda x: ", ".join(x))
-
+    
     cofacilitators = df[df["cofacilitated"] == 1.0].groupby("conversation_id")["speaker_name"].unique().reset_index()
     cofacilitators.columns = ["conversation_id", "cofacilitators"]
     cofacilitators["is_fac"] = cofacilitators["cofacilitators"].apply(lambda x: len(x) > 0)
@@ -218,7 +219,7 @@ def conversational_structure(df):
     speaker_info = speaker_info.merge(facilitators, on="conversation_id", how="left")
     
     final = speaker_info.merge(metrics, on="conversation_id", how="left")
-
+    
     # Drop rows where facilitator info is missing
     final = final.dropna(subset=["facilitators"])
     final = final.drop(columns=["is_fac_y", "is_fac_x"])
@@ -243,14 +244,20 @@ if __name__ == "__main__":
     # Prepare the data
     df = prepare_data(df)
     
-    # Compute conversational structure and save to CSV
+    # Compute conversational structure
     cs = conversational_structure(df)
-    cs.to_csv(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure.csv", index=False)
     
-    # --- NEW: Plot the Gini Coefficients ---
-    # Group the data by conversation and calculate the Gini coefficients
+    # Calculate Gini coefficients and rename the turn coefficient to Gc
     grouped = df.groupby("conversation_id")
     gini_df = calculate_gini_coefficients(grouped)
+    gini_df = gini_df.rename(columns={"Equitable_turn_distribution": "Gc"})
     
-    # Display the updated Gini coefficient scatter plot
+    # Merge Gini coefficients into the conversational structure dataframe
+    cs = cs.merge(gini_df, on="conversation_id", how="left")
+    
+    # Save the merged dataframe with Gini coefficients (Gd and Gc) included
+    cs.to_csv(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure.csv", index=False)
+    
+    # Optionally, display the scatter plot for Gini coefficients
     plot_gini_coefficients(gini_df)
+

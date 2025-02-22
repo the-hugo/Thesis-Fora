@@ -1,7 +1,16 @@
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
+import plotly.express as px
 from scipy import stats
+import itertools
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+# --- Open a log file to save statistical measures ---
+log_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\statistical_measures.txt"
+log_file = open(log_path, "w")
+
+def log(message):
+    print(message)
+    log_file.write(message + "\n")
 
 # --- Load the Merged Conversational Structure Data ---
 merged_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure_with_clusters.csv"
@@ -9,7 +18,6 @@ df = pd.read_csv(merged_path)
 
 # --- Define Role Group for Each Conversation ---
 def assign_role(row):
-    # Only consider conversations that have at least one facilitator role.
     if row['Managers'] > 0 and row['Interlocutors'] > 0:
         return "Mixed Roles"
     elif row['Managers'] > 0:
@@ -17,123 +25,196 @@ def assign_role(row):
     elif row['Interlocutors'] > 0:
         return "Interlocutor"
     else:
-        return None  # if neither is present
+        return None
 
-# Create a new column for role group and drop rows without any facilitator roles.
 df['role_group'] = df.apply(assign_role, axis=1)
 df_roles = df[df['role_group'].notna()].copy()
-print("Columns in df_roles:", df_roles.columns)
+log("Columns in df_roles: " + ", ".join(df_roles.columns))
 
 # --- Compute the Turn Taking Equity Metric ---
-# Turn taking equity is defined as: 1 - ((Gd + Gc) / 2)
 df_roles['turn_taking_equity'] = 1 - ((df_roles['Gd'] + df_roles['Gc']) / 2)
 
-# --- Statistical Tests ---
+# --- Create Ratio Variables ---
+df_roles['personal_story_ratio'] = df_roles['personal_story'] / df_roles['num_turns']
+df_roles['personal_sharing_ratio'] = df_roles['personal_sharing'] / df_roles['num_turns']
+df_roles['personal_experience_ratio'] = df_roles['personal_experience'] / df_roles['num_turns']
 
-# List the unique role groups (e.g., "Manager", "Interlocutor", "Mixed Roles")
+# --- Statistical Tests for All Role Groups ---
 role_groups = df_roles['role_group'].unique()
-print("Role groups found:", role_groups)
+log("Role groups found: " + ", ".join(role_groups))
 
-# --- Test Relationship between Role Group and Personal Sharing ---
+def perform_tests_all(variable_name):
+    groups = [df_roles[df_roles['role_group'] == group][variable_name] for group in role_groups]
+    f_val, p_val = stats.f_oneway(*groups)
+    log(f"\nANOVA for {variable_name} across role groups:")
+    log(f"F-value: {f_val:.20f}, p-value: {p_val:.20f}")
+    
+    h_stat, p_val_kw = stats.kruskal(*groups)
+    log(f"\nKruskal-Wallis test for {variable_name} across role groups:")
+    log(f"H-statistic: {h_stat:.20f}, p-value: {p_val_kw:.20f}")
 
-# Group personal_sharing values by role_group
-personal_sharing_groups = [
-    df_roles[df_roles['role_group'] == group]['personal_sharing'] for group in role_groups
-]
+# --- Perform tests for the existing variables ---
+for variable in ['personal_sharing_ratio', 'personal_story_ratio', 'personal_experience_ratio', 'turn_taking_equity']:
+    perform_tests_all(variable)
 
-# One-way ANOVA for personal_sharing
-f_val_ps, p_val_ps = stats.f_oneway(*personal_sharing_groups)
-print("\nANOVA for personal_sharing across role groups:")
-print("F-value: {:.4f}, p-value: {:.4f}".format(f_val_ps, p_val_ps))
-
-# Kruskal-Wallis test (non-parametric) for personal_sharing
-h_stat_ps, p_val_kw_ps = stats.kruskal(*personal_sharing_groups)
-print("\nKruskal-Wallis test for personal_sharing across role groups:")
-print("H-statistic: {:.4f}, p-value: {:.4f}".format(h_stat_ps, p_val_kw_ps))
-
-# --- Test Relationship between Role Group and Personal Story ---
-
-# Group personal_story values by role_group
-personal_story_groups = [
-    df_roles[df_roles['role_group'] == group]['personal_story'] for group in role_groups
-]
-
-# One-way ANOVA for personal_story
-f_val_story, p_val_story = stats.f_oneway(*personal_story_groups)
-print("\nANOVA for personal_story across role groups:")
-print("F-value: {:.4f}, p-value: {:.4f}".format(f_val_story, p_val_story))
-
-# Kruskal-Wallis test (non-parametric) for personal_story
-h_stat_story, p_val_kw_story = stats.kruskal(*personal_story_groups)
-print("\nKruskal-Wallis test for personal_story across role groups:")
-print("H-statistic: {:.4f}, p-value: {:.4f}".format(h_stat_story, p_val_kw_story))
-
-# --- Test Relationship between Role Group and Turn Taking Equity ---
-
-# Group turn_taking_equity values by role_group
-equity_groups = [
-    df_roles[df_roles['role_group'] == group]['turn_taking_equity'] for group in role_groups
-]
-
-# One-way ANOVA for turn_taking_equity
-f_val_te, p_val_te = stats.f_oneway(*equity_groups)
-print("\nANOVA for turn_taking_equity across role groups:")
-print("F-value: {:.4f}, p-value: {:.4f}".format(f_val_te, p_val_te))
-
-# Kruskal-Wallis test for turn_taking_equity
-h_stat_te, p_val_kw_te = stats.kruskal(*equity_groups)
-print("\nKruskal-Wallis test for turn_taking_equity across role groups:")
-print("H-statistic: {:.4f}, p-value: {:.4f}".format(h_stat_te, p_val_kw_te))
+# --- Perform tests for Gc and Gd ---
+for variable in ['Gc', 'Gd']:
+    perform_tests_all(variable)
 
 # --- Save the Updated DataFrame ---
 save_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure_with_clusters_with_tests.csv"
 df_roles.to_csv(save_path, index=False)
-print("\nData saved to", save_path)
+log("\nData saved to " + save_path)
 
-# --- Plot Histograms for the Role Columns ---
+# --- Filter Data to Only Include Manager and Interlocutor ---
+df_mi = df_roles[df_roles['role_group'].isin(['Manager', 'Interlocutor'])].copy()
 
-# Define role columns
-role_columns = ['Managers', 'Interlocutors', 'Socializers', 'Story tellers', 'Debators']
+# Set role_group as an ordered categorical variable so that "Manager" comes first.
+df_mi['role_group'] = pd.Categorical(df_mi['role_group'],
+                                     categories=['Manager', 'Interlocutor'],
+                                     ordered=True)
 
-plt.figure(figsize=(15, 10))
-for i, col in enumerate(role_columns, 1):
-    plt.subplot(2, 3, i)
-    # Define bins based on the maximum count for the role (plus one to include the max)
-    plt.hist(df[col], bins=range(0, df[col].max() + 2), edgecolor='black', alpha=0.7)
-    plt.title(f'Histogram of {col}')
-    plt.xlabel(col)
-    plt.ylabel('Frequency')
-plt.tight_layout()
-plt.show()
+# Define category order for Plotly visualizations.
+category_order = {'role_group': ['Manager', 'Interlocutor']}
 
-roles_to_plot = ['Manager', 'Interlocutor', 'Mixed Roles']
-df_plot = df_roles[df_roles['role_group'].isin(roles_to_plot)]
+# --- Plotting with Plotly ---
+def plot_box(variable_name, title, xlabel):
+    fig = px.box(
+        df_mi,
+        x=variable_name,
+        y='role_group',
+        color='role_group',
+        title=title,
+        labels={variable_name: xlabel, 'role_group': "Role Group"},
+        category_orders=category_order
+    )
+    fig.update_layout(showlegend=False)
+    fig.show()
 
-plt.figure(figsize=(8, 6))
-sns.boxplot(x='personal_story', y='role_group', data=df_plot, palette='pastel')
-plt.title("Personal Story by Role Group")
-plt.xlabel("Personal Story")
-plt.ylabel("Role Group")
-plt.tight_layout()
-plt.show()
+# Uncomment the lines below to generate box plots:
+# plot_box('personal_story_ratio', "Personal Story Ratio by Role", "Personal Story (per turn)")
+plot_box('personal_sharing_ratio', "Personal Sharing Ratio by Role", "Personal Sharing (per turn)")
+# plot_box('personal_experience_ratio', "Personal Experience Ratio by Role", "Personal Experience (per turn)")
+plot_box('turn_taking_equity', "Turn Taking Equity by Role", "Turn Taking Equity")
+# You can also create box plots for Gc and Gd, e.g.:
+# plot_box('Gc', "Gc by Role Group", "Gc")
+# plot_box('Gd', "Gd by Role Group", "Gd")
 
-# --- (Optional) Create Horizontal Box Plots for Personal Sharing and Turn Taking Equity by Role Group ---
-# Uncomment these sections if you wish to view these plots as well.
+def plot_violin(variable_name, title, xlabel):
+    fig = px.violin(
+        df_mi,
+        x=variable_name,
+        y='role_group',
+        color='role_group',
+        box=True,       # overlays a box plot inside the violin
+        points='all',   # shows all data points
+        title=title,
+        labels={variable_name: xlabel, 'role_group': "Role Group"},
+        category_orders=category_order
+    )
+    fig.update_layout(showlegend=False)
+    fig.show()
 
-# # 1. Box Plot for Personal Sharing
-# plt.figure(figsize=(8, 6))
-# sns.boxplot(x='personal_sharing', y='role_group', data=df_roles, orient='h')
-# plt.title("Personal Sharing by Role Group")
-# plt.xlabel("Personal Sharing")
-# plt.ylabel("Role Group")
-# plt.tight_layout()
-# plt.show()
+# Uncomment the lines below to generate violin plots:
+# plot_violin('personal_story_ratio', "Personal Story Ratio by Role Group", "Personal Story (per turn)")
+# plot_violin('personal_sharing_ratio', "Personal Sharing Ratio by Role Group", "Personal Sharing (per turn)")
+# plot_violin('personal_experience_ratio', "Personal Experience Ratio by Role Group", "Personal Experience (per turn)")
+# plot_violin('turn_taking_equity', "Turn Taking Equity by Role Group", "Turn Taking Equity")
+# Similarly, for Gc and Gd:
+# plot_violin('Gc', "Gc by Role Group", "Gc")
+# plot_violin('Gd', "Gd by Role Group", "Gd")
 
-# # 2. Box Plot for Turn Taking Equity
-# plt.figure(figsize=(8, 6))
-# sns.boxplot(x='turn_taking_equity', y='role_group', data=df_roles, orient='h')
-# plt.title("Turn Taking Equity by Role Group")
-# plt.xlabel("Turn Taking Equity (1 - Mean Gini)")
-# plt.ylabel("Role Group")
-# plt.tight_layout()
-# plt.show()
+# --- Statistical Tests for Managers vs. Interlocutors ---
+def perform_tests(variable_name):
+    groups = [df_mi[df_mi['role_group'] == group][variable_name] for group in ['Manager', 'Interlocutor']]
+    f_val, p_val = stats.f_oneway(*groups)
+    log(f"\nANOVA for {variable_name} (Managers vs. Interlocutors):")
+    log(f"F-value: {f_val:.20f}, p-value: {p_val:.20f}")
+    
+    h_stat, p_val_kw = stats.kruskal(*groups)
+    log(f"\nKruskal-Wallis test for {variable_name} (Managers vs. Interlocutors):")
+    log(f"H-statistic: {h_stat:.20f}, p-value: {p_val_kw:.20f}")
+
+# --- Perform tests for the existing variables ---
+for variable in ['personal_sharing_ratio', 'personal_story_ratio', 'personal_experience_ratio', 'turn_taking_equity']:
+    perform_tests(variable)
+
+# --- Perform tests for Gc and Gd ---
+for variable in ['Gc', 'Gd']:
+    perform_tests(variable)
+
+# --- Tukey HSD Post-hoc Test on the Filtered Data ---
+def perform_tukey(variable_name):
+    tukey = pairwise_tukeyhsd(endog=df_mi[variable_name],
+                              groups=df_mi['role_group'],
+                              alpha=0.05)
+    log(f"\nTukey HSD results for {variable_name} (Managers vs. Interlocutors):")
+    # Convert the summary table to a string and log it.
+    log(str(tukey.summary()))
+
+# --- Perform Tukey HSD for the existing variables ---
+for variable in ['personal_sharing_ratio', 'personal_story_ratio', 'personal_experience_ratio', 'turn_taking_equity']:
+    perform_tukey(variable)
+
+# --- Perform Tukey HSD for Gc and Gd ---
+for variable in ['Gc', 'Gd']:
+    perform_tukey(variable)
+
+# --- Cohen's d Effect Size ---
+def cohen_d(x, y):
+    nx = len(x)
+    ny = len(y)
+    dof = nx + ny - 2
+    pooled_std = (((nx - 1) * x.std(ddof=1)**2 + (ny - 1) * y.std(ddof=1)**2) / dof)**0.5
+    # Compute d as (Manager_mean - Interlocutor_mean); a positive value indicates Managers have higher values.
+    return (x.mean() - y.mean()) / pooled_std
+
+log("\nCohen's d effect sizes (Managers vs. Interlocutors):")
+for variable in ['personal_sharing_ratio', 'personal_story_ratio', 'personal_experience_ratio', 'turn_taking_equity']:
+    data_manager = df_mi[df_mi['role_group'] == 'Manager'][variable]
+    data_interlocutor = df_mi[df_mi['role_group'] == 'Interlocutor'][variable]
+    d = cohen_d(data_manager, data_interlocutor)
+    log(f"  For {variable}: d = {d:.20f}")
+
+# --- Cohen's d for Gc and Gd ---
+for variable in ['Gc', 'Gd']:
+    data_manager = df_mi[df_mi['role_group'] == 'Manager'][variable]
+    data_interlocutor = df_mi[df_mi['role_group'] == 'Interlocutor'][variable]
+    d = cohen_d(data_manager, data_interlocutor)
+    log(f"  For {variable}: d = {d:.20f}")
+
+# --- Save Boxplot Statistics (including the mean) ---
+def save_boxplot_stats(variable_name):
+    for group in ['Manager', 'Interlocutor']:
+        data = df_mi[df_mi['role_group'] == group][variable_name]
+        mean_val = data.mean()
+        q1 = data.quantile(0.25)
+        median = data.median()
+        q3 = data.quantile(0.75)
+        iqr = q3 - q1
+        # Determine whiskers based on the 1.5 * IQR rule
+        lower_whisker = data[data >= q1 - 1.5 * iqr].min()
+        upper_whisker = data[data <= q3 + 1.5 * iqr].max()
+        # Identify outliers
+        outliers = data[(data < q1 - 1.5 * iqr) | (data > q3 + 1.5 * iqr)]
+        
+        log(f"\nBoxplot statistics for {variable_name} in group {group}:")
+        log(f"  Mean: {mean_val:.4f}")
+        log(f"  Q1: {q1:.4f}")
+        log(f"  Median: {median:.4f}")
+        log(f"  Q3: {q3:.4f}")
+        log(f"  IQR: {iqr:.4f}")
+        log(f"  Lower Whisker: {lower_whisker:.4f}")
+        log(f"  Upper Whisker: {upper_whisker:.4f}")
+        log(f"  Outliers: {outliers.tolist()}")
+
+# --- Save boxplot stats for the existing variables ---
+for variable in ['personal_sharing_ratio', 'personal_story_ratio', 'personal_experience_ratio', 'turn_taking_equity']:
+    save_boxplot_stats(variable)
+
+# --- Save boxplot stats for Gc and Gd ---
+for variable in ['Gc', 'Gd']:
+    save_boxplot_stats(variable)
+
+# --- Close the log file ---
+log_file.close()

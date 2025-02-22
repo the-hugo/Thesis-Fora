@@ -2,7 +2,7 @@ import pandas as pd
 import statsmodels.formula.api as smf
 
 # --- Load the Merged Conversational Structure Data ---
-merged_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure_with_clusters.csv"
+merged_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure_with_clusters_with_tests.csv"
 df = pd.read_csv(merged_path)
 
 # --- Define Role Group for Each Conversation ---
@@ -29,7 +29,7 @@ df_roles['Interlocutors_binary'] = (df_roles['Interlocutors'] > 0).astype(int)
 # --- Regression Model for Personal Sharing ---
 # We include both facilitator roles (as binary) and conversation-level controls.
 model_personal_sharing = smf.ols(
-    "personal_sharing ~ Manager_binary + Interlocutors_binary + num_speakers + num_turns + conversation_length", 
+    "personal_sharing_ratio ~ Manager_binary + Interlocutors_binary + num_speakers + conversation_length", 
     data=df_roles
 ).fit()
 
@@ -38,7 +38,7 @@ print(model_personal_sharing.summary())
 
 # --- Regression Model for Personal Story ---
 model_personal_story = smf.ols(
-    "personal_story ~ Manager_binary + Interlocutors_binary + num_speakers + num_turns + conversation_length", 
+    "personal_story_ratio ~ Manager_binary + Interlocutors_binary + num_speakers + conversation_length", 
     data=df_roles
 ).fit()
 
