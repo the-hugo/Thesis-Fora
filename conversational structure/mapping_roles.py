@@ -16,7 +16,7 @@ df_conv = pd.read_csv(conversational_structure_path)
 fac_counts = df_fac.groupby(['conversation_id', 'cluster']).size().unstack(fill_value=0).reset_index()
 
 # Rename columns: cluster 0 -> Managers, cluster 1 -> Interlocutors
-fac_counts = fac_counts.rename(columns={0: 'Managers', 1: 'Interlocutors'})
+fac_counts = fac_counts.rename(columns={1: 'Managers', 0: 'Interlocutors'})
 
 # --- Process Participants ---
 

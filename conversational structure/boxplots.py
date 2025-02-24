@@ -89,6 +89,12 @@ def plot_box(variable_name, title, xlabel):
         category_orders=category_order
     )
     fig.update_layout(showlegend=False)
+    fig.update_layout(
+        font=dict(size=24),
+        autosize=False,
+        width=1920,
+        height=1080
+    )
     fig.show()
 
 # Uncomment the lines below to generate box plots:

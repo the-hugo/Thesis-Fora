@@ -20,11 +20,9 @@ def load_data(input_path):
 def aggregate_features(df):
     df["speaker_name"] = df["speaker_name"].str.lower().str.strip()
     df["speaker_name"] = df["speaker_name"].str.replace(r"\[.*\]", "", regex=True)
-    df = df[
-        ~df["speaker_name"].str.contains(
-            "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
-        )
-    ]
+    df = df[~df["speaker_name"].str.contains(
+        "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
+    )]
     df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
 
     df = df.drop(columns=["Unnamed: 0", "id"])
@@ -53,12 +51,6 @@ def aggregate_features(df):
 
 
 def preprocessing(df):
-    """
-    features = df.drop(columns=["speaker_name"]).values
-    latent_attention_embeddings = np.vstack(df['Latent_Attention_Embedding'].values)
-    other_features = df.drop(columns=["speaker_name", "Latent_Attention_Embedding"]).values
-    combined_features = np.hstack((latent_attention_embeddings, other_features))
-    """
     # Drop columns ending with _x or _y if their counterparts exist
     for col in df.columns:
         if col.endswith('_x') and col[:-2] + '_y' in df.columns:
@@ -68,7 +60,6 @@ def preprocessing(df):
             df = df.drop(columns=[col])
             df = df.rename(columns={col[:-2] + '_x': col[:-2]})
     
-    # combined_features = df.drop(columns=["speaker_name", "conversation_id"])
     combined_features = df.copy()
     rows_before = combined_features.shape[0]
     combined_features = combined_features.dropna()
@@ -82,12 +73,8 @@ def preprocessing(df):
 
 def apply_umap(combined_features):
     # Preserve 'conversation_id' and 'speaker_name' columns
-    preserved_columns = combined_features[
-        ["conversation_id", "speaker_name"]
-    ].reset_index(drop=True)
-    combined_features = combined_features.drop(
-        columns=["conversation_id", "speaker_name"]
-    ).reset_index(drop=True)
+    preserved_columns = combined_features[["conversation_id", "speaker_name"]].reset_index(drop=True)
+    combined_features = combined_features.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
 
     scaled_X = StandardScaler().fit_transform(combined_features)
 
@@ -106,30 +93,25 @@ def apply_umap(combined_features):
 
 
 def plot_clusters(df):
+    # Convert clusters to string for discrete coloring
+    df["cluster"] = df["cluster"].astype(str)
     fig = px.scatter(
         df,
         x="umap_0",
         y="umap_1",
         color="cluster",
         hover_name="speaker_name",
+        title="Facilitator Clustering",
+        labels={"umap_0": "UMAP Dimension 1", "umap_1": "UMAP Dimension 2", "cluster": "Cluster"},
+        color_discrete_sequence=px.colors.qualitative.Plotly  # using a discrete color palette
     )
-    # add colors
     fig.update_traces(marker=dict(size=8, opacity=0.8))
     fig.update_layout(
-        title="UMAP Clustering",
-        xaxis_title="UMAP Dimension 1",
-        yaxis_title="UMAP Dimension 2",
-        legend_title="Cluster",
-        # use a color mode without yellow
-        coloraxis=dict(
-            colorscale=[
-                [0.0, "rgb(0,0,255)"],
-                [0.5, "rgb(0,255,0)"],
-                [1.0, "rgb(255,0,0)"],
-            ]
-        ),
+        font=dict(size=24),
+        autosize=False,
+        width=1920,
+        height=1080
     )
-
     fig.show()
 
 
@@ -142,7 +124,7 @@ def k_means(df, n_clusters):
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     df["cluster"] = kmeans.fit_predict(df)
     centroids = kmeans.cluster_centers_
-    show_centroids(centroids, df, n_clusters)
+    show_centroids(centroids, df, n_clusters)  # Updated to use Plotly for bar charts
 
     # Add back the preserved columns
     df = pd.concat([preserved_columns, df], axis=1)
@@ -152,14 +134,10 @@ def k_means(df, n_clusters):
 def prepare_data(df):
     df["speaker_name"] = df["speaker_name"].str.lower().str.strip()
     df["speaker_name"] = df["speaker_name"].str.replace(r"\[.*\]", "", regex=True)
-    df = df[
-        ~df["speaker_name"].str.contains(
-            "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
-        )
-    ]
+    df = df[~df["speaker_name"].str.contains(
+        "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
+    )]
     df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
-    # kick every row out where adherence_to_guide is nan
-    # df = df.dropna(subset=["adherence_to_guide"])
 
     selection = True
     if selection:
@@ -169,31 +147,16 @@ def prepare_data(df):
             "Clout",
             "Authentic",
             "Tone",
-            # "WPS",
-            # "duration",
-            #"Rd",
-            #"Rc",
             "Personal story",
             "Personal experience",
-            # "QMark",
-            # "Validation Strategies",
-            # "Invitations to Participate",
-            # "Facilitation Strategies",
             "Cognition",
-            # "Social",
             "Responsivity",
-            # "fac_to_part_ratio",
-            # "participant_semantic_speed",
-            # "facilitator_semantic_speed",
-            # "role_change_rate",
             "adherence_to_guide"
         ]
     else:
-        features = df.columns.difference(
-            ["Unnamed: 0", "conversation_id", "speaker_name"]
-        )
+        features = df.columns.difference(["Unnamed: 0", "conversation_id", "speaker_name"])
 
-    # Plot a correlation matrix
+    # Plot a correlation matrix using matplotlib (optional)
     correlation_matrix = df[features].corr()
     plt.figure(figsize=(12, 6))
     plt.title("Correlation Matrix")
@@ -204,8 +167,6 @@ def prepare_data(df):
     plt.tight_layout()
     plt.show()
 
-    # Winsorize the data to handle outliers
-    # Normalize the data to have zero mean and unit variance
     # Preserve 'conversation_id' and 'speaker_name' columns
     preserved_columns = df[["conversation_id", "speaker_name"]].reset_index(drop=True)
     df = df.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
@@ -219,32 +180,17 @@ def prepare_data(df):
     # Assess multicollinearity using Variance Inflation Factor (VIF)
     vif_data = pd.DataFrame()
     vif_data["feature"] = df.columns
-    vif_data["VIF"] = [
-        variance_inflation_factor(df.values, i) for i in range(df.shape[1])
-    ]
+    vif_data["VIF"] = [variance_inflation_factor(df.values, i) for i in range(df.shape[1])]
     print("VIF Data:\n", vif_data)
-
-    # Assess collinearity using Pearson correlations
-    df.corr()
-    # print("Correlation Matrix:\n", correlation_matrix)
 
     # Add back the preserved columns
     df = pd.concat([preserved_columns, df], axis=1)
-
     return df
 
 
 def determine_cluster(df, max_clusters=10, random_state=42):
     """
     Determine the optimal number of clusters for a dataset using the Elbow Method and Silhouette Score.
-
-    Parameters:
-        df (pd.DataFrame): The input data (only numerical columns should be included).
-        max_clusters (int): The maximum number of clusters to evaluate.
-        random_state (int): The random state for reproducibility.
-
-    Returns:
-        int: The optimal number of clusters.
     """
     wcss = []  # Within-cluster sum of squares
     silhouette_scores = []
@@ -262,7 +208,6 @@ def determine_cluster(df, max_clusters=10, random_state=42):
     plt.title("Elbow Method for Optimal Clusters")
     plt.xlabel("Number of Clusters")
     plt.ylabel("WCSS (Within Cluster Sum of Squares)")
-    # plt.show()
 
     # Plot the Silhouette Score
     plt.figure(figsize=(10, 5))
@@ -270,40 +215,47 @@ def determine_cluster(df, max_clusters=10, random_state=42):
     plt.title("Silhouette Score for Optimal Clusters")
     plt.xlabel("Number of Clusters")
     plt.ylabel("Silhouette Score")
-    # plt.show()
 
     # Determine the optimal number of clusters based on the maximum Silhouette Score
     optimal_clusters = cluster_range[silhouette_scores.index(max(silhouette_scores))]
     print(f"Optimal number of clusters based on Silhouette Score: {optimal_clusters}")
-
     return optimal_clusters
 
 
 def show_centroids(centroids, df, n_clusters):
-    # Ensure column names are stripped of leading/trailing spaces
+    # Remove any extra whitespace from column names
     df.columns = df.columns.str.strip()
 
-    # Exclude the "cluster" column
+    # Exclude the "cluster" column (if present)
     feature_columns = df.columns[df.columns != "cluster"]
 
     centroids_df = pd.DataFrame(centroids, columns=feature_columns)
     centroids_df.index.name = "Cluster"
 
-    feature_means = df.mean()
+    feature_means = df.drop(columns=["cluster"]).mean() if "cluster" in df.columns else df.mean()
 
+    cluster_names = {1: "Manager's", 0: "Interlocutor's"}
+
+    # Create a bar chart for each cluster using Plotly
     for cluster_idx in range(n_clusters):
-        plt.figure(figsize=(12, 6))
+        cluster_name = cluster_names.get(cluster_idx, f"Cluster {cluster_idx}")
         deviations = centroids_df.iloc[cluster_idx] - feature_means
-        # Exclude cluster from deviations
-        if "cluster" in deviations.index:
-            deviations = deviations.drop("cluster")
-        deviations.plot(kind="bar", color="skyblue", edgecolor="black")
-        plt.axhline(0, color="gray", linestyle="--")
-        plt.title(f"Cluster {cluster_idx} Feature Deviations from Mean")
-        plt.xlabel("Features")
-        plt.ylabel("Deviation from Mean")
-        plt.tight_layout()
-        plt.show()
+        deviations = deviations.drop("cluster", errors="ignore")
+        fig = px.bar(
+            x=deviations.index,
+            y=deviations.values,
+            labels={"x": "Features", "y": "Deviation from Mean"},
+            title=f"{cluster_name} Features",
+            color_discrete_sequence=["#00A5EC"]  # Set the bar color to #FFC600
+        )
+        fig.update_layout(xaxis_tickangle=-45)
+        fig.update_layout(
+        font=dict(size=24),
+        autosize=False,
+        width=1920,
+        height=1080
+    )
+        fig.show()
 
     return centroids_df
 
@@ -315,7 +267,6 @@ def show_centroids(centroids, df, n_clusters):
 def pca_analysis_overall(df, feature_columns=None, n_components=2):
     """
     Perform PCA on the dataset to determine the contribution of each feature.
-    If feature_columns is not provided, it will exclude 'conversation_id', 'speaker_name', 'cluster', and any UMAP columns.
     """
     if feature_columns is None:
         exclude = {"conversation_id", "speaker_name", "cluster"}
@@ -345,13 +296,16 @@ def pca_analysis_overall(df, feature_columns=None, n_components=2):
 
 def plot_pca_scores(pc_df):
     """Plot the first two PCA components, coloring points by cluster."""
+    # Ensure cluster is treated as discrete
+    pc_df["cluster"] = pc_df["cluster"].astype(str)
     fig = px.scatter(
         pc_df, 
         x="PC1", 
         y="PC2", 
         color="cluster", 
         title="PCA Scatter Plot by Cluster",
-        labels={"PC1": "Principal Component 1", "PC2": "Principal Component 2"}
+        labels={"PC1": "Principal Component 1", "PC2": "Principal Component 2", "cluster": "Cluster"},
+        color_discrete_sequence=px.colors.qualitative.Plotly
     )
     fig.show()
 
@@ -363,21 +317,7 @@ if __name__ == "__main__":
     input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
     print("Loading data")
     df = load_data(input_path)
-    # df = df.dropna(subset=["Latent_Attention_Embedding"])
-    # df = df[df["is_fac"] == False]
-
-    # print("Aggregating features by speaker")
-    # df = aggregate_features(df)
-
-    # Exclude specific columns
-    # exclude_columns = [
-    #    "Facilitation Strategies",
-    #    "Invitations to Participate",
-    #    "Validation Strategies",
-    # ]
-    # exclude_columns = ["Rc", "Rd"]
-    # df = df.drop(columns=exclude_columns)
-
+    
     print("Applying UMAP to all features")
     df = preprocessing(df)
 

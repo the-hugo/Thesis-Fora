@@ -305,24 +305,24 @@ class GlobalEmbeddingVisualizer:
         # Add UMAP parameter annotations
         neighbors = self.umap_params["n_neighbors"]
         metric = self.umap_params["metric"]
-        fig.update_layout(
-            annotations=[
-                dict(
-                    text=f"Neighbors: {neighbors}<br>"
-                        f"Metric: {metric}<br>"
-                        f"Truncate Turns: {self.truncate_turns}<br>"
-                        f"Supervised: {self.supervised_umap_enabled}<br>"
-                        f"Label: {self.supervised_umap_label_column}",
-                    x=0,
-                    y=1,
-                    xref="paper",
-                    yref="paper",
-                    showarrow=False,
-                    font=dict(size=8),
-                    align="center",
-                )
-            ]
-        )
+        # fig.update_layout(
+        #     annotations=[
+        #         dict(
+        #             text=f"Neighbors: {neighbors}<br>"
+        #                 f"Metric: {metric}<br>"
+        #                 f"Truncate Turns: {self.truncate_turns}<br>"
+        #                 f"Supervised: {self.supervised_umap_enabled}<br>"
+        #                 f"Label: {self.supervised_umap_label_column}",
+        #             x=0,
+        #             y=1,
+        #             xref="paper",
+        #             yref="paper",
+        #             showarrow=False,
+        #             font=dict(size=8),
+        #             align="center",
+        #         )
+        #     ]
+        # )
 
         neighbors_str = str(neighbors)
         final_output_path = (
@@ -337,6 +337,14 @@ class GlobalEmbeddingVisualizer:
             + ".html"
         )
         fig.write_html(final_output_path)
+        fig.update_layout(
+            font=dict(size=24),
+            autosize=False,
+            width=1920,
+            height=1080,
+            title=dict(x=0.5, xanchor='center'),
+            legend=dict(x=0.85, y=0.5, xanchor='center')
+        )
         fig.show()
         print(
             f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"

@@ -249,7 +249,7 @@ class GlobalEmbeddingVisualizer:
             "phaticity ratio": True,  # now included to see the continuous value
         }
 
-        title = "Facilitator Turn Embeddings (Continuous Phaticity)"
+        title = "Facilitator Turn Embeddings Colored by Phaticity Ratio"
 
         # Sort dataframe for consistent ordering
         df_sorted = self.speaker_embeddings.sort_values(
@@ -289,17 +289,17 @@ class GlobalEmbeddingVisualizer:
         )
 
         # Add annotations with details on UMAP parameters.
-        fig.update_layout(
-            annotations=[dict(
-                text=f"Neighbors: {self.umap_params['n_neighbors']}<br>"
-                    f"Metric: {self.umap_params['metric']}<br>"
-                    f"Truncate Turns: {self.truncate_turns}<br>"
-                    f"Supervised: {self.supervised_umap_enabled}<br>"
-                    f"Label: {self.supervised_umap_label_column}",
-                x=0, y=1, xref="paper", yref="paper",
-                showarrow=False, font=dict(size=8), align="center"
-            )]
-        )
+        # fig.update_layout(
+        #     annotations=[dict(
+        #         text=f"Neighbors: {self.umap_params['n_neighbors']}<br>"
+        #             f"Metric: {self.umap_params['metric']}<br>"
+        #             f"Truncate Turns: {self.truncate_turns}<br>"
+        #             f"Supervised: {self.supervised_umap_enabled}<br>"
+        #             f"Label: {self.supervised_umap_label_column}",
+        #         x=0, y=1, xref="paper", yref="paper",
+        #         showarrow=False, font=dict(size=8), align="center"
+        #     )]
+        # )
 
         # Save and display the plot.
         neighbors = str(self.umap_params["n_neighbors"])
@@ -315,6 +315,14 @@ class GlobalEmbeddingVisualizer:
             + ".html"
         )
         fig.write_html(final_output_path)
+        fig.update_layout(
+            font=dict(size=24),
+            autosize=False,
+            width=1920,
+            height=1080,
+            title=dict(x=0.5, xanchor='center'),
+            legend=dict(x=0.85, y=0.5, xanchor='center')
+        )
         fig.show()
         print(
             f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
