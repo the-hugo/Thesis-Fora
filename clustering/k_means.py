@@ -94,6 +94,7 @@ def apply_umap(combined_features):
 
 def plot_clusters(df):
     # Convert clusters to string for discrete coloring
+    print(len(df))
     df["cluster"] = df["cluster"].astype(str)
     fig = px.scatter(
         df,
@@ -103,7 +104,7 @@ def plot_clusters(df):
         hover_name="speaker_name",
         title="Facilitator Clustering",
         labels={"umap_0": "UMAP Dimension 1", "umap_1": "UMAP Dimension 2", "cluster": "Cluster"},
-        color_discrete_sequence=px.colors.qualitative.Plotly  # using a discrete color palette
+        color_discrete_sequence=px.colors.qualitative.Plotly
     )
     fig.update_traces(marker=dict(size=8, opacity=0.8))
     fig.update_layout(
@@ -155,7 +156,7 @@ def prepare_data(df):
         ]
     else:
         features = df.columns.difference(["Unnamed: 0", "conversation_id", "speaker_name"])
-
+    # rename phaticity ratio to Phaticity Ratio
     # Plot a correlation matrix using matplotlib (optional)
     correlation_matrix = df[features].corr()
     plt.figure(figsize=(12, 6))
@@ -223,39 +224,62 @@ def determine_cluster(df, max_clusters=10, random_state=42):
 
 
 def show_centroids(centroids, df, n_clusters):
+    df.rename(columns={"phaticity ratio": "Phaticity Ratio"}, inplace=True)
     # Remove any extra whitespace from column names
     df.columns = df.columns.str.strip()
 
     # Exclude the "cluster" column (if present)
     feature_columns = df.columns[df.columns != "cluster"]
 
+    # Create a DataFrame for the centroids using the feature columns
     centroids_df = pd.DataFrame(centroids, columns=feature_columns)
     centroids_df.index.name = "Cluster"
 
+    # Compute the overall feature means (excluding the cluster column, if present)
     feature_means = df.drop(columns=["cluster"]).mean() if "cluster" in df.columns else df.mean()
 
-    cluster_names = {1: "Manager's", 0: "Interlocutor's"}
+    # Define custom names for clusters
+    cluster_names = {1: "Managers", 0: "Interlocutors"}
+    #cluster_names = {1: "Storytellers", 0: "Socializers", 2: "Debaters"}
 
-    # Create a bar chart for each cluster using Plotly
+    # Prepare a list to hold deviation data for each feature and cluster
+    data = []
     for cluster_idx in range(n_clusters):
         cluster_name = cluster_names.get(cluster_idx, f"Cluster {cluster_idx}")
         deviations = centroids_df.iloc[cluster_idx] - feature_means
         deviations = deviations.drop("cluster", errors="ignore")
-        fig = px.bar(
-            x=deviations.index,
-            y=deviations.values,
-            labels={"x": "Features", "y": "Deviation from Mean"},
-            title=f"{cluster_name} Features",
-            color_discrete_sequence=["#00A5EC"]  # Set the bar color to #FFC600
-        )
-        fig.update_layout(xaxis_tickangle=-45)
-        fig.update_layout(
+        for feature, deviation in deviations.items():
+            data.append({
+                'Feature': feature,
+                'Deviation': deviation,
+                'Cluster': cluster_name
+            })
+
+    # Create a DataFrame from the aggregated data
+    grouped_df = pd.DataFrame(data)
+    
+    # Generate a grouped bar chart using Plotly Express
+    fig = px.bar(
+        grouped_df,
+        x='Feature',
+        y='Deviation',
+        color='Cluster',
+        barmode='group',
+        labels={'Feature': 'Features', 'Deviation': 'Deviation from Mean'},
+        title="Cluster Feature Deviations",
+        color_discrete_sequence=px.colors.qualitative.Plotly  # Customize colors as desired
+    )
+    #FFC500, #F8EE30, #F6A20A ["#FFC500", "#84E291", "#F6A20A"] 
+
+    # Update layout for better readability and presentation
+    fig.update_layout(
+        xaxis_tickangle=-45,
         font=dict(size=24),
         autosize=False,
         width=1920,
         height=1080
     )
-        fig.show()
+    fig.show()
 
     return centroids_df
 

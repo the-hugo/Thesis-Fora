@@ -7,10 +7,10 @@ file_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\T
 
 # Read the CSV file
 df = pd.read_csv(file_path)
-df.rename(columns={"Story tellers": "Storytellers"}, inplace=True)
+df.rename(columns={"Story tellers": "Storytellers", "Debators": "Debaters"}, inplace=True)
 
 # Define the role columns
-role_columns = ['Managers', 'Interlocutors', 'Socializers', 'Storytellers', 'Debators']
+role_columns = ['Managers', 'Interlocutors', 'Socializers', 'Storytellers', 'Debaters']
 
 # ----------------------
 # 1. Bar Chart: Total counts of each role across all conversations
@@ -22,7 +22,7 @@ total_counts.columns = ['Role', 'Count']
 palette = {
     'Interlocutors': '#00A4EB',
     'Managers': '#00A4EB',
-    'Debators': '#FFC600',
+    'Debaters': '#FFC600',
     'Storytellers': '#FFC600',
     'Socializers': '#FFC600'
 }
@@ -34,6 +34,12 @@ fig1 = px.bar(total_counts,
               color_discrete_map=palette,
               title="Total Counts of Each Role Across Fora Corpus")
 fig1.update_layout(xaxis_title="Role", yaxis_title="Count")
+fig1.update_layout(
+            font=dict(size=24),
+            autosize=False,
+            width=1920,
+            height=1080,
+        )
 fig1.show()
 
 # ----------------------
