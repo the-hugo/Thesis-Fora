@@ -4,6 +4,7 @@
   "show_only": "all",
   "aggregate_embeddings": true,
   "truncate_turns": false,
+  "plot_mode": "3D",
   "collection_name": "corpus_data",
   "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/embeddings/data_nv-embed_processed_output.pkl",
   "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/graphs/nv-embed/corpus/",

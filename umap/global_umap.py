@@ -15,6 +15,7 @@ class GlobalEmbeddingVisualizer:
         with open(config_path, "r") as config_file:
             self.config = json.load(config_file)
 
+        self.plot_mode = self.config["plot_mode"]
         self.color_by_role = self.config["color_by_role"]
         self.model = self.config["model"]
         self.collection_name = self.config["collection_name"]
@@ -209,6 +210,8 @@ class GlobalEmbeddingVisualizer:
     def plot_aggregated(self):
         self.compute_aggregated_embeddings()
 
+        # Compute UMAP embedding and add columns. Even though we compute three dimensions,
+        # for 2D we’ll only use the first two.
         embedding_2d = self.compute_umap(self.speaker_embeddings)
         self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
         self.speaker_embeddings["UMAP_2"] = embedding_2d[:, 1]
@@ -226,108 +229,115 @@ class GlobalEmbeddingVisualizer:
             "UMAP_3": False,
         }
 
-        # When color_by_role is active, update the legend to map symbols to roles.
+        # Update color and symbol mapping when coloring by role.
         if self.color_by_role == "f_p":
-            # Map is_fac: True -> Facilitator, False -> Participant
             self.speaker_embeddings["symbol"] = self.speaker_embeddings["is_fac"].apply(
                 lambda x: "Facilitator" if x else "Participant"
             )
-            color_column = "symbol"  # Use the role labels for both color and symbol
-            custom_color_palette = ["#ffc600", "#00a4eb"]  # Colors for Facilitator and Participant
+            color_column = "symbol"  # Use role labels for both color and symbol.
+            custom_color_palette = ["#ffc600", "#00a4eb"]  # Colors for Facilitator and Participant.
             legend_title = "Role"
-            # Specify the symbol sequence explicitly so that:
-            # "Facilitator" (alphabetically first) gets a square, and
-            # "Participant" gets a circle.
             symbol_sequence = ["diamond", "circle"]
         else:
             color_column = "collection_title"
             custom_color_palette = self.custom_color_palette
             legend_title = "Collection"
-            symbol_sequence = None  # No override if not coloring by role
+            symbol_sequence = None
 
-        # Sorting to help with legend ordering
+        # Sorting helps maintain consistency in the legend ordering.
         df_sorted = self.speaker_embeddings.sort_values(by=["symbol", "collection_title"])
 
-        # Set the diagram title as specified
-        title = "Aggregated Turn Embeddings on Conversational Level"
-
-        # Create the 3D scatter plot.
-        # If we have a symbol sequence (in f_p mode), pass it in.
-        if symbol_sequence:
-            fig = px.scatter_3d(
-                df_sorted,
-                x="UMAP_1",
-                y="UMAP_2",
-                z="UMAP_3",
-                color=color_column,
-                symbol="symbol",
-                symbol_sequence=symbol_sequence,
-                title=title,
-                hover_name="speaker_name",
-                hover_data=hover_data,
-                color_discrete_sequence=custom_color_palette,
-            )
-        else:
-            fig = px.scatter_3d(
-                df_sorted,
-                x="UMAP_1",
-                y="UMAP_2",
-                z="UMAP_3",
-                color=color_column,
-                symbol="symbol",
-                title=title,
-                hover_name="speaker_name",
-                hover_data=hover_data,
-                color_discrete_sequence=custom_color_palette,
-            )
-
-        fig.update_traces(
-            marker=dict(
-                size=self.plot_marker_size,
-                line=dict(width=self.plot_marker_line_width, color="black"),
-            )
-        )
-
-        # Remove axis labels and tick markers
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(title=None, showticklabels=False),
-                yaxis=dict(title=None, showticklabels=False),
-                zaxis=dict(title=None, showticklabels=False),
-            )
-        )
-
-        # Update legend title and sizing
-        fig.update_layout(
-            legend_title_text=legend_title, legend=dict(itemsizing="constant")
-        )
-
-        # Add UMAP parameter annotations
+        # UMAP parameters (neighbors, metric, etc.) can be used for filenames or annotations.
         neighbors = self.umap_params["n_neighbors"]
-        metric = self.umap_params["metric"]
-        # fig.update_layout(
-        #     annotations=[
-        #         dict(
-        #             text=f"Neighbors: {neighbors}<br>"
-        #                 f"Metric: {metric}<br>"
-        #                 f"Truncate Turns: {self.truncate_turns}<br>"
-        #                 f"Supervised: {self.supervised_umap_enabled}<br>"
-        #                 f"Label: {self.supervised_umap_label_column}",
-        #             x=0,
-        #             y=1,
-        #             xref="paper",
-        #             yref="paper",
-        #             showarrow=False,
-        #             font=dict(size=8),
-        #             align="center",
-        #         )
-        #     ]
-        # )
-
         neighbors_str = str(neighbors)
+
+        # Check if we are in 2D mode.
+        if hasattr(self, "plot_mode") and self.plot_mode == "2D":
+            # Create a 2D scatter plot.
+            fig = px.scatter(
+                df_sorted,
+                x="UMAP_1",
+                y="UMAP_2",
+                color=color_column,
+                symbol="symbol" if symbol_sequence else None,
+                hover_name="speaker_name",
+                hover_data=hover_data,
+                color_discrete_sequence=custom_color_palette,
+            )
+            # Remove background, axes, titles, margins, and legend so that only the points are visible.
+            fig.update_layout(
+                xaxis=dict(visible=False, showgrid=False, zeroline=False),
+                yaxis=dict(visible=False, showgrid=False, zeroline=False),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                title="",
+                margin=dict(l=0, r=0, t=0, b=0),
+                showlegend=False,
+            )
+            fig.update_traces(marker=dict(size=8))
+
+        else:
+            # Create the 3D scatter plot.
+            title = "Aggregated Turn Embeddings on Conversational Level"
+            if symbol_sequence:
+                fig = px.scatter_3d(
+                    df_sorted,
+                    x="UMAP_1",
+                    y="UMAP_2",
+                    z="UMAP_3",
+                    color=color_column,
+                    symbol="symbol",
+                    symbol_sequence=symbol_sequence,
+                    title=title,
+                    hover_name="speaker_name",
+                    hover_data=hover_data,
+                    color_discrete_sequence=custom_color_palette,
+                )
+            else:
+                fig = px.scatter_3d(
+                    df_sorted,
+                    x="UMAP_1",
+                    y="UMAP_2",
+                    z="UMAP_3",
+                    color=color_column,
+                    symbol="symbol",
+                    title=title,
+                    hover_name="speaker_name",
+                    hover_data=hover_data,
+                    color_discrete_sequence=custom_color_palette,
+                )
+
+            fig.update_traces(
+                marker=dict(
+                    size=self.plot_marker_size,
+                    line=dict(width=self.plot_marker_line_width, color="black"),
+                )
+            )
+
+            # Remove axis labels and tick markers.
+            fig.update_layout(
+                scene=dict(
+                    xaxis=dict(visible=False, showgrid=False, zeroline=False),
+                    yaxis=dict(visible=False, showgrid=False, zeroline=False),
+                    zaxis=dict(visible=False, showgrid=False, zeroline=False)
+                ),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                title="",
+                margin=dict(l=0, r=0, t=0, b=0),
+                showlegend=False,
+            )
+            fig.update_traces(marker=dict(size=8))
+
+            fig.update_layout(
+                legend_title_text=legend_title, legend=dict(itemsizing="constant")
+            )
+
+        # Define the output filename. Optionally append '_2d' for 2D plots.
         final_output_path = (
             self.output_path_template
             + "umap_embeddings"
+            + ("_2d" if hasattr(self, "plot_mode") and self.plot_mode == "2D" else "")
             + "_"
             + level
             + "_"
@@ -337,18 +347,22 @@ class GlobalEmbeddingVisualizer:
             + ".html"
         )
         fig.write_html(final_output_path)
-        fig.update_layout(
-            font=dict(size=24),
-            autosize=False,
-            width=1920,
-            height=1080,
-            title=dict(x=0.5, xanchor='center'),
-            legend=dict(x=0.85, y=0.5, xanchor='center')
-        )
+
+        # For 3D plots, you may want to set a larger size and adjust fonts.
+        if not (hasattr(self, "plot_mode") and self.plot_mode == "2D"):
+            fig.update_layout(
+                font=dict(size=24),
+                autosize=False,
+                width=2560,  # Increased width
+                height=1440,  # Increased height
+                title=dict(x=0.5, xanchor="center"),
+                legend=dict(x=0.85, y=0.5, xanchor="center"),
+            )
         fig.show()
         print(
             f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
         )
+
 
 
 
