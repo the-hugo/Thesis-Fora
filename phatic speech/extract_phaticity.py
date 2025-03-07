@@ -97,7 +97,11 @@ def plot_histogram(df):
         x="normalized_time", 
         y="phaticity_ratio",
         labels={"normalized_time": "Normalized Time (%)", "average_phaticity_ratio": "Average Phaticity Ratio"},
-        title="Average Phaticity Ratio Distribution Over Normalized Time",
+        title="Average Phaticity Ratio Over Normalized Time",
+    )
+    fig.update_layout(
+        font=dict(size=20),
+        width=1920
     )
     #fig.update_layout()
     fig.show()
@@ -146,9 +150,9 @@ if __name__ == "__main__":
     print("Plotting histogram")
     conversation = False
 
-    #plot_histogram(df)
+    plot_histogram(df)
     #plot_histogram_conv(df)
     
     # save as pickle and csv
-    df.to_pickle(input_path.replace(".pkl", "_phatic_ratio.pkl"))
-    df.to_csv(input_path.replace(".pkl", "_phatic_ratio.csv"))
+    #df.to_pickle(input_path.replace(".pkl", "_phatic_ratio.pkl"))
+    #df.to_csv(input_path.replace(".pkl", "_phatic_ratio.csv"))

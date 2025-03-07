@@ -2,12 +2,12 @@
   "model": "nv-embed",
   "aggregate_on_collection": false,
   "show_only": "all",
-  "aggregate_embeddings": true,
+  "aggregate_embeddings": false,
   "truncate_turns": false,
   "plot_mode": "3D",
   "collection_name": "corpus_data",
   "input_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/embeddings/data_nv-embed_processed_output.pkl",
-  "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/graphs/nv-embed/corpus/",
+  "output_path_template": "C:/Users/paul-/Documents/Uni/Management and Digital Technologies/Thesis Fora/Code/data/output/graphs/nv-embed/",
   "custom_color_palette": [
     "rgb(170, 13, 254)", "rgb(50, 131, 254)", "rgb(133, 102, 13)", "rgb(120, 42, 182)", 
     "rgb(86, 86, 86)", "rgb(28, 131, 86)", "rgb(22, 255, 50)", "rgb(247, 225, 160)", 
@@ -18,7 +18,7 @@
   "umap_params": {
     "n_components": 3,
     "random_state": 42,
-    "n_neighbors": 200,
+    "n_neighbors": 15,
     "metric": "cosine"
   },
 

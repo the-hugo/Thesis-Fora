@@ -4,7 +4,8 @@ import plotly.graph_objs as go
 import plotly.io as pio
 
 # Load your dataset
-df = pd.read_pickle(r'C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\data\output\umap\data_nv-embed_processed_output.pkl')
+df = pd.read_pickle(r'C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\embeddings\data_nv-embed_processed_output.pkl')
+df = pd.read_pickle(r'C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\embeddings\data_nv-embed_processed_output.pkl')
 df = df[df['annotated']].copy()
 
 # Normalize time within each conversation
@@ -83,10 +84,28 @@ for conversation_id, conversation_df in df.groupby('conversation_id'):
 
     # Set up the layout
     layout = go.Layout(
-        title=f'Facilitation Strategies and Personal Sharing for Conversation {conversation_id} (0-100)',
-        xaxis=dict(title='Normalized Time (0-100)'),
-        yaxis=dict(title='Count'),
-        legend=dict(x=0.05, y=0.95)
+        title={
+            'text': f'Facilitation Strategies and Personal Sharing for Conversation {conversation_id} (0-100)',
+            'font': {'size': 24}
+        },
+        xaxis=dict(
+            title={
+                'text': 'Normalized Time (0-100)',
+                'font': {'size': 18}
+            },
+            tickfont={'size': 14}
+        ),
+        yaxis=dict(
+            title={
+                'text': 'Count',
+                'font': {'size': 18}
+            },
+            tickfont={'size': 14}
+        ),
+        legend=dict(
+            x=0.05, y=0.95,
+            font={'size': 14}
+        )
     )
 
     # Create the figure for this conversation

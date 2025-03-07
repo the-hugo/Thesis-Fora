@@ -21,9 +21,14 @@ def compute_cosine_similarity(embedding1, embedding2):
 def compute_responsivity(df, window_size=6, decay_rate=0.1):
     """
     Compute speaker responsivity matrix and time-varying responsivity.
+    Additionally, output a CSV containing each raw comparison between utterances.
 
     Args:
-        df (pd.DataFrame): DataFrame containing conversation data.
+        df (pd.DataFrame): DataFrame containing conversation data. Expected columns:
+            - "speaker_name": Name of the speaker.
+            - "Latent-Attention_Embedding": Embedding vector for the turn.
+            - "SpeakerTurn": Timestamp or turn index.
+            - "words": Text snippet of the utterance.
         window_size (int): Time window for considering previous turns (in seconds).
         decay_rate (float): Exponential decay rate for weighting past turns.
 
@@ -33,12 +38,13 @@ def compute_responsivity(df, window_size=6, decay_rate=0.1):
     """
     speaker_names = df["speaker_name"].unique()
     num_speakers = len(speaker_names)
-    embeddings = df["Latent-Attention_Embedding"].tolist()
-
     speaker_idx = {name: i for i, name in enumerate(speaker_names)}
 
     responsivity_matrix = np.zeros((num_speakers, num_speakers))
     time_varying_responsivity = {speaker: [] for speaker in speaker_names}
+    
+    # List to hold details of each individual comparison.
+    comparisons = []
 
     for i, speaker_A in enumerate(speaker_names):
         for j, speaker_B in enumerate(speaker_names):
@@ -51,37 +57,54 @@ def compute_responsivity(df, window_size=6, decay_rate=0.1):
             for _, turn_B in speaker_B_turns.iterrows():
                 embedding_B = turn_B["Latent-Attention_Embedding"]
                 timestamp_B = turn_B["SpeakerTurn"]
+                words_B = turn_B["words"]
 
+                # Get previous turns of speaker A within the window.
                 relevant_A_turns = speaker_A_turns[
-                    (speaker_A_turns["SpeakerTurn"] < timestamp_B)
-                    & (speaker_A_turns["SpeakerTurn"] >= timestamp_B - window_size)
+                    (speaker_A_turns["SpeakerTurn"] < timestamp_B) &
+                    (speaker_A_turns["SpeakerTurn"] >= timestamp_B - window_size)
                 ]
-
                 if relevant_A_turns.empty:
                     continue
 
                 for _, turn_A in relevant_A_turns.iterrows():
                     embedding_A = turn_A["Latent-Attention_Embedding"]
                     timestamp_A = turn_A["SpeakerTurn"]
-                    time_diff = timestamp_B - timestamp_A
+                    words_A = turn_A["words"]
 
+                    time_diff = timestamp_B - timestamp_A
                     weight = math.exp(-decay_rate * time_diff)
                     similarity = compute_cosine_similarity(embedding_A, embedding_B)
-                    similarities.append(weight * similarity)
+                    weighted_similarity = weight * similarity
+                    similarities.append(weighted_similarity)
 
+                    # Record the comparison details.
+                    comparisons.append({
+                        "speaker_A": speaker_A,
+                        "speaker_B": speaker_B,
+                        "timestamp_A": timestamp_A,
+                        "timestamp_B": timestamp_B,
+                        "words_A": words_A,
+                        "words_B": words_B,
+                        "time_diff": time_diff,
+                        "weight": weight,
+                        "cosine_similarity": similarity,
+                        "weighted_similarity": weighted_similarity
+                    })
+
+            # Set responsivity matrix entry as the mean of weighted similarities if comparisons exist.
             if similarities:
                 responsivity_matrix[i, j] = np.mean(similarities)
+            time_varying_responsivity[speaker_B].append(np.mean(similarities) if similarities else 0)
 
-            time_varying_responsivity[speaker_B].append(
-                np.mean(similarities) if similarities else 0
-            )
-
-    # 
-    
-    
     responsivity_df = pd.DataFrame(
         responsivity_matrix, index=speaker_names, columns=speaker_names
     )
+
+    # Convert the individual comparisons to a DataFrame and output to CSV.
+    comparisons_df = pd.DataFrame(comparisons)
+    comparisons_df.to_csv("utterance_comparisons.csv", index=False)
+    print("CSV file 'utterance_comparisons.csv' has been created with individual comparison details.")
 
     return responsivity_df, time_varying_responsivity
 
