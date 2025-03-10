@@ -12,7 +12,7 @@ df = pd.read_csv(target_file)
 
 # Define relevant columns
 columns = [
-    "num_speakers", "conversation_length",
+    "num_speakers", "conversation_length", "collection_id",
     "Managers", "Interlocutors", "Socializers", "Story tellers", "Debators", "turn_taking_equity", "num_turns", "personal_sharing", "personal_story", "personal_experience", "personal_sharing_ratio", "personal_story_ratio", "personal_experience_ratio"
 ]
 

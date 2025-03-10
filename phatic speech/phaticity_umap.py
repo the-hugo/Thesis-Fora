@@ -264,11 +264,11 @@ class GlobalEmbeddingVisualizer:
             y="UMAP_2",
             z="UMAP_3",
             color="phaticity ratio",
-            title=title,
             hover_name="speaker_name",
             hover_data=hover_data,
             color_continuous_scale=[[0, "#ffc600"], [1, "#00B141"]]
         )
+        fig.update_traces(showscale=False)
 
         # Update marker properties: use circles and set the desired size and outline.
         fig.update_traces(
@@ -276,15 +276,6 @@ class GlobalEmbeddingVisualizer:
                 size=self.plot_marker_size,
                 line=dict(width=self.plot_marker_line_width, color="black"),
                 symbol="circle"
-            )
-        )
-
-        # Remove axis labels and tick markers.
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(title=None, showticklabels=False),
-                yaxis=dict(title=None, showticklabels=False),
-                zaxis=dict(title=None, showticklabels=False),
             )
         )
 
@@ -301,27 +292,57 @@ class GlobalEmbeddingVisualizer:
         #     )]
         # )
 
-        # Save and display the plot.
-        neighbors = str(self.umap_params["n_neighbors"])
-        final_output_path = (
-            self.output_path_template
-            + "umap_embeddings"
-            + "_"
-            + level
-            + "_"
-            + self.show_only
-            + "_"
-            + neighbors
-            + ".html"
-        )
-        fig.write_html(final_output_path)
+        # Compute bounds for the UMAP coordinates.
+        x_min, x_max = df_sorted["UMAP_1"].min(), df_sorted["UMAP_1"].max()
+        y_min, y_max = df_sorted["UMAP_2"].min(), df_sorted["UMAP_2"].max()
+        z_min, z_max = df_sorted["UMAP_3"].min(), df_sorted["UMAP_3"].max()
+        center = [(x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2]
+        max_range = max(x_max - x_min, y_max - y_min, z_max - z_min)
+        # A factor to set how far out the camera should be (adjustable).
+        distance_factor = 2.5
+        eye = {
+            "x": center[0] + distance_factor * max_range,
+            "y": center[1] + distance_factor * max_range,
+            "z": center[2] + distance_factor * max_range,
+        }
+
+        # Update layout settings, preserving current variables.
         fig.update_layout(
-            font=dict(size=24),
             autosize=False,
-            width=1920,
-            height=1080,
-            title=dict(x=0.5, xanchor='center'),
-            legend=dict(x=0.85, y=0.5, xanchor='center')
+            width=2560,
+            height=1440,
+            paper_bgcolor="rgba(0,0,0,0)",  # Updated background to transparent.
+            plot_bgcolor="rgba(0,0,0,0)",   # Updated background to transparent.
+            title="",  # Remove title.
+            scene=dict(
+                camera=dict(eye=eye, projection=dict(type="orthographic")),
+                xaxis=dict(
+                    title="",  # Remove X axis label.
+                    visible=False,
+                    showticklabels=False,
+                    showgrid=False,
+                    zeroline=False,
+                    showbackground=False,
+                ),
+                yaxis=dict(
+                    title="",  # Remove Y axis label.
+                    visible=False,
+                    showticklabels=False,
+                    showgrid=False,
+                    zeroline=False,
+                    showbackground=False,
+                ),
+                zaxis=dict(
+                    title="",  # Remove Z axis label.
+                    visible=False,
+                    showticklabels=False,
+                    showgrid=False,
+                    zeroline=False,
+                    showbackground=False,
+                ),
+            ),
+            margin=dict(l=20, r=20, t=20, b=20),
+            showlegend=False,
         )
         fig.show()
         print(

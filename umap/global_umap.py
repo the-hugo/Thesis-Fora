@@ -317,9 +317,11 @@ class GlobalEmbeddingVisualizer:
                 legend_title_text=legend_title, legend=dict(itemsizing="constant")
             )
             fig.update_layout(
-                font=dict(size=18),
-                title=dict(x=0.5, xanchor="center"),
-                legend=dict(x=0.85, y=0.5, xanchor="center"),
+                font=dict(size=16),
+                autosize=False,
+                width=1600,
+                height=900,
+                margin=dict(t=150, b=150)
             )
         final_output_path = (
             self.output_path_template
@@ -333,8 +335,8 @@ class GlobalEmbeddingVisualizer:
             + neighbors_str
             + ".png"
         )
-        fig.write_image(final_output_path)
-        fig.show()
+        #fig.write_image(final_output_path)
+        #fig.show()
         print(
             f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
         )
@@ -399,18 +401,17 @@ class GlobalEmbeddingVisualizer:
                     hover_data=hover_data,
                     color_discrete_sequence=custom_color_palette,
                 )
+                fig.update_traces(marker=dict(size=8))
                 fig.update_layout(
                     xaxis=dict(visible=False, showgrid=False, zeroline=False),
                     yaxis=dict(visible=False, showgrid=False, zeroline=False),
                     plot_bgcolor="rgba(0,0,0,0)",
                     paper_bgcolor="rgba(0,0,0,0)",
-                    title=f"Embeddings for Conversation {convo}",
-                    title_x=0.5,
-                    title_y=0.9,  # Lower the title vertically
-                    margin=dict(l=0, r=0, t=50, b=0),
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    autosize=True,
                     showlegend=False,
+                    title={'text': f"Embeddings for Conversation {convo}", 'x': 0.5},
                 )
-                fig.update_traces(marker=dict(size=8))
             else:
                 title = f"Embeddings for Conversation {convo}"
                 if symbol_sequence:
@@ -422,10 +423,7 @@ class GlobalEmbeddingVisualizer:
                         color=color_column,
                         symbol="symbol",
                         symbol_sequence=symbol_sequence,
-                        hover_name="speaker_name",
-                        hover_data=hover_data,
                         color_discrete_sequence=custom_color_palette,
-                        title=title,
                     )
                 else:
                     fig = px.scatter_3d(
@@ -435,10 +433,7 @@ class GlobalEmbeddingVisualizer:
                         z="UMAP_3",
                         color=color_column,
                         symbol="symbol",
-                        hover_name="speaker_name",
-                        hover_data=hover_data,
                         color_discrete_sequence=custom_color_palette,
-                        title=title,
                     )
                 fig.update_traces(
                     marker=dict(
@@ -446,43 +441,43 @@ class GlobalEmbeddingVisualizer:
                         line=dict(width=self.plot_marker_line_width, color="black"),
                     )
                 )
+                # Compute bounds for the UMAP coordinates.
+                x_min, x_max = df_sorted["UMAP_1"].min(), df_sorted["UMAP_1"].max()
+                y_min, y_max = df_sorted["UMAP_2"].min(), df_sorted["UMAP_2"].max()
+                z_min, z_max = df_sorted["UMAP_3"].min(), df_sorted["UMAP_3"].max()
+                center = [(x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2]
+                max_range = max(x_max - x_min, y_max - y_min, z_max - z_min)
+                # A factor to set how far out the camera should be (adjustable).
+                distance_factor = 2.5
+                eye = {
+                    "x": center[0] + distance_factor * max_range,
+                    "y": center[1] + distance_factor * max_range,
+                    "z": center[2] + distance_factor * max_range,
+                }
                 fig.update_layout(
                     scene=dict(
+                        camera=dict(eye=eye, projection=dict(type="orthographic")),
                         xaxis=dict(visible=False, showgrid=False, zeroline=False),
                         yaxis=dict(visible=False, showgrid=False, zeroline=False),
-                        zaxis=dict(visible=False, showgrid=False, zeroline=False)
+                        zaxis=dict(visible=False, showgrid=False, zeroline=False),
                     ),
                     plot_bgcolor="rgba(0,0,0,0)",
                     paper_bgcolor="rgba(0,0,0,0)",
-                    margin=dict(l=0, r=0, t=50, b=0),
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    autosize=True,
                     showlegend=False,
-                    title=dict(text=title, x=0.5, y=0.9, xanchor="center"),  # Adjust title position here
                 )
-                fig.update_traces(marker=dict(size=8))
-                fig.update_layout(
-                    legend_title_text=legend_title, legend=dict(itemsizing="constant")
-                )
-                fig.update_layout(
-                    font=dict(size=18),
-                )
-            final_output_path = (
-                self.output_path_template
-                + "umap_embeddings_conversation_"
-                + str(convo)
-                + ("_2d" if hasattr(self, "plot_mode") and self.plot_mode == "2D" else "")
-                + "_"
-                + self.show_only
-                + "_"
-                + neighbors_str
-                + ".png"
-            )
-            fig.write_image(final_output_path)
-            fig.show()
+            final_output_path = self.output_path_template + str(convo) + ".png"
+            # Save the plot as an interactive HTML file instead of a static PNG image.
+            html_output_path = final_output_path.replace(".png", ".html")
+            fig.write_html(html_output_path)
+            # fig.show()
             print(f"Saved UMAP plot for conversation {convo} at {final_output_path}")
+
 
 
 # Usage
 config_path = "./config.json"
 visualizer = GlobalEmbeddingVisualizer(config_path)
-visualizer.plot_aggregated()  # Existing aggregated plot
+#visualizer.plot_aggregated()  # Existing aggregated plot
 visualizer.plot_per_conversation()  # New: one plot per conversation_id
