@@ -2,7 +2,7 @@
   "model": "nv-embed",
   "aggregate_on_collection": false,
   "show_only": "all",
-  "aggregate_embeddings": false,
+  "aggregate_embeddings": true,
   "truncate_turns": false,
   "plot_mode": "3D",
   "collection_name": "corpus_data",
@@ -18,7 +18,7 @@
   "umap_params": {
     "n_components": 3,
     "random_state": 42,
-    "n_neighbors": 7,
+    "n_neighbors": 200,
     "metric": "cosine"
   },
 

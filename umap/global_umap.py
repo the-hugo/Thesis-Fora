@@ -206,7 +206,7 @@ class GlobalEmbeddingVisualizer:
 
     def plot_aggregated(self):
         self.compute_aggregated_embeddings()
-
+    
         # Compute UMAP embedding and add columns.
         embedding_2d = self.compute_umap(self.speaker_embeddings)
         self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
@@ -317,11 +317,11 @@ class GlobalEmbeddingVisualizer:
                 legend_title_text=legend_title, legend=dict(itemsizing="constant")
             )
             fig.update_layout(
-                font=dict(size=16),
+                font=dict(size=20),
                 autosize=False,
-                width=1600,
-                height=900,
-                margin=dict(t=150, b=150)
+                width=3000,
+                height=2000,
+                margin=dict(t=30, b=30)
             )
         final_output_path = (
             self.output_path_template
@@ -335,8 +335,8 @@ class GlobalEmbeddingVisualizer:
             + neighbors_str
             + ".png"
         )
-        #fig.write_image(final_output_path)
-        #fig.show()
+        fig.write_html(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\umap\umap_embeddings.html")
+        fig.show()
         print(
             f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
         )
@@ -479,5 +479,5 @@ class GlobalEmbeddingVisualizer:
 # Usage
 config_path = "./config.json"
 visualizer = GlobalEmbeddingVisualizer(config_path)
-#visualizer.plot_aggregated()  # Existing aggregated plot
-visualizer.plot_per_conversation()  # New: one plot per conversation_id
+visualizer.plot_aggregated()  # Existing aggregated plot
+#visualizer.plot_per_conversation()  # New: one plot per conversation_id

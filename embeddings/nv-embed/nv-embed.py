@@ -1,18 +1,22 @@
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 import pandas as pd
 from tqdm import tqdm
-from transformers import logging, AutoModel
+# from transformers import logging, AutoModel
 import os
-import huggingface_hub.utils
+# import huggingface_hub.utils
 
-logging.set_verbosity_error()
+# logging.set_verbosity_error()
 
-huggingface_hub.utils._http.default_timeout = 230
+# huggingface_hub.utils._http.default_timeout = 230
 collection_name = "corpus_data"
 input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\data\input\{}\{}_transformed_data.csv".format(collection_name, collection_name)
-data = pd.read_csv(input_path, sep=',')
+data = pd.read_csv(r"data/corpus_resources/data.csv", sep=',')
 data['Latent-Attention_Embedding'] = None
 
+print(f"Max duration: {data['duration'].max()}")
+print(f"Min duration: {data['duration'].min()}")
+print(f"Mean duration: {data['duration'].mean()}")
+    
 # 1. Load a pretrained Sentence Transformer model
 model = SentenceTransformer('nvidia/NV-Embed-v2', trust_remote_code=True)
 model.max_seq_length = 32768

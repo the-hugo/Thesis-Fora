@@ -59,6 +59,7 @@ class GlobalEmbeddingVisualizer:
         print(
             f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'"
         )
+        #self.df = self.df.sample(frac=0.1)
 
     def compute_umap(self, data):
         scaled_X = StandardScaler().fit_transform(
@@ -213,22 +214,17 @@ class GlobalEmbeddingVisualizer:
 
     def plot_aggregated(self):
         """
-    Phatic Speech Part (Continuous)
-    """
-    
+        Phatic Speech Part (Continuous)
+        """
+        
         # Remove rows with NaN in phaticity ratio.
         initial_count = len(self.df)
         self.df = self.df.dropna(subset=["phaticity ratio"])
+        
         dropped_count = initial_count - len(self.df)
         print(f"Dropped {dropped_count} rows due to NaN values in 'phaticity ratio'")
         
-        # Do not threshold the phaticity ratio;
-        # keep its continuous value (assumed to be between 0 and 1)
-        
-        """
-        End of Phatic Speech Part
-        """
-        
+        # Compute embeddings and UMAP.
         self.compute_aggregated_embeddings()
         embedding_2d = self.compute_umap(self.speaker_embeddings)
 
@@ -246,18 +242,13 @@ class GlobalEmbeddingVisualizer:
             "UMAP_1": False,
             "UMAP_2": False,
             "UMAP_3": False,
-            "phaticity ratio": True,  # now included to see the continuous value
+            "phaticity ratio": True,  # display the continuous value in hover
         }
 
-        title = "Facilitator Turn Embeddings Colored by Phaticity Ratio"
-
         # Sort dataframe for consistent ordering
-        df_sorted = self.speaker_embeddings.sort_values(
-            by=["symbol", "collection_title"]
-        )
-        
-        # Use a continuous color scale based on phaticity ratio.
-        # Here we create a custom scale that maps 0 to yellow and 1 to green.
+        df_sorted = self.speaker_embeddings.sort_values(by=["symbol", "collection_title"])
+
+        # Create a 3D scatter plot with a continuous color scale based on phaticity ratio.
         fig = px.scatter_3d(
             df_sorted,
             x="UMAP_1",
@@ -266,31 +257,22 @@ class GlobalEmbeddingVisualizer:
             color="phaticity ratio",
             hover_name="speaker_name",
             hover_data=hover_data,
-            color_continuous_scale=[[0, "#ffc600"], [1, "#00B141"]]
+            color_continuous_scale=["#ffc600", "#00B142"],
+            range_color=[0, 1]
         )
-        fig.update_traces(showscale=False)
-
+        
+        # Remove the color scale (colorbar) by disabling it on the trace markers and color axes.
+        fig.update_traces(marker=dict(showscale=False))
+        fig.update_coloraxes(showscale=False)
+        
         # Update marker properties: use circles and set the desired size and outline.
         fig.update_traces(
             marker=dict(
                 size=self.plot_marker_size,
                 line=dict(width=self.plot_marker_line_width, color="black"),
-                symbol="circle"
+                symbol="circle",
             )
         )
-
-        # Add annotations with details on UMAP parameters.
-        # fig.update_layout(
-        #     annotations=[dict(
-        #         text=f"Neighbors: {self.umap_params['n_neighbors']}<br>"
-        #             f"Metric: {self.umap_params['metric']}<br>"
-        #             f"Truncate Turns: {self.truncate_turns}<br>"
-        #             f"Supervised: {self.supervised_umap_enabled}<br>"
-        #             f"Label: {self.supervised_umap_label_column}",
-        #         x=0, y=1, xref="paper", yref="paper",
-        #         showarrow=False, font=dict(size=8), align="center"
-        #     )]
-        # )
 
         # Compute bounds for the UMAP coordinates.
         x_min, x_max = df_sorted["UMAP_1"].min(), df_sorted["UMAP_1"].max()
@@ -298,26 +280,25 @@ class GlobalEmbeddingVisualizer:
         z_min, z_max = df_sorted["UMAP_3"].min(), df_sorted["UMAP_3"].max()
         center = [(x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2]
         max_range = max(x_max - x_min, y_max - y_min, z_max - z_min)
-        # A factor to set how far out the camera should be (adjustable).
-        distance_factor = 2.5
+        distance_factor = 2.5  # adjustable camera distance factor
         eye = {
             "x": center[0] + distance_factor * max_range,
             "y": center[1] + distance_factor * max_range,
             "z": center[2] + distance_factor * max_range,
         }
 
-        # Update layout settings, preserving current variables.
+        # Update layout: remove axis labels, gridlines, and legends.
         fig.update_layout(
             autosize=False,
             width=2560,
             height=1440,
-            paper_bgcolor="rgba(0,0,0,0)",  # Updated background to transparent.
-            plot_bgcolor="rgba(0,0,0,0)",   # Updated background to transparent.
-            title="",  # Remove title.
+            paper_bgcolor="rgba(0,0,0,0)",  # transparent background
+            plot_bgcolor="rgba(0,0,0,0)",     # transparent plot area
+            title="",                       # remove title
             scene=dict(
                 camera=dict(eye=eye, projection=dict(type="orthographic")),
                 xaxis=dict(
-                    title="",  # Remove X axis label.
+                    title="",
                     visible=False,
                     showticklabels=False,
                     showgrid=False,
@@ -325,7 +306,7 @@ class GlobalEmbeddingVisualizer:
                     showbackground=False,
                 ),
                 yaxis=dict(
-                    title="",  # Remove Y axis label.
+                    title="",
                     visible=False,
                     showticklabels=False,
                     showgrid=False,
@@ -333,7 +314,7 @@ class GlobalEmbeddingVisualizer:
                     showbackground=False,
                 ),
                 zaxis=dict(
-                    title="",  # Remove Z axis label.
+                    title="",
                     visible=False,
                     showticklabels=False,
                     showgrid=False,
@@ -344,10 +325,10 @@ class GlobalEmbeddingVisualizer:
             margin=dict(l=20, r=20, t=20, b=20),
             showlegend=False,
         )
+        
         fig.show()
-        print(
-            f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})"
-        )
+        fig.write_html(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\phatic speech\phaticity_umap.html")
+        print(f"Saved {'aggregated' if self.aggregate_embeddings else 'individual'} UMAP plot for {self.collection_name} at {level} Level (Show: {self.show_only})")
 
 
 

@@ -93,9 +93,11 @@ def apply_umap(combined_features):
 
 
 def plot_clusters(df):
-    # Convert clusters to string for discrete coloring
+    # Print the number of rows and convert clusters to string for discrete coloring
     print(len(df))
     df["cluster"] = df["cluster"].astype(str)
+    
+    # Create the scatter plot using Plotly Express
     fig = px.scatter(
         df,
         x="umap_0",
@@ -103,17 +105,31 @@ def plot_clusters(df):
         color="cluster",
         hover_name="speaker_name",
         title="Facilitator Clustering",
-        labels={"umap_0": "UMAP Dimension 1", "umap_1": "UMAP Dimension 2", "cluster": "Cluster"},
+        labels={
+            "umap_0": "UMAP Dimension 1",
+            "umap_1": "UMAP Dimension 2",
+            "cluster": "Cluster"
+        },
         color_discrete_sequence=px.colors.qualitative.Plotly
     )
-    fig.update_traces(marker=dict(size=8, opacity=0.8))
+
+    # Update marker appearance (size only, to match CODE)
+    fig.update_traces(marker=dict(size=8))
+    
+    # Update layout: hide axes, remove grid/zero lines, set transparent background,
+    # add margins, enable autosize, hide legend, and center the title
     fig.update_layout(
-        font=dict(size=24),
-        autosize=False,
-        width=1920,
-        height=1080
+        xaxis=dict(visible=False, showgrid=False, zeroline=False),
+        yaxis=dict(visible=False, showgrid=False, zeroline=False),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=20, b=20),
+        autosize=True,
+        showlegend=False,
+        #title={'text': "P Clustering", 'x': 0.5},
     )
-    fig.show()
+    
+    fig.write_html("scatter_plot.html")
 
 
 def k_means(df, n_clusters):
@@ -139,11 +155,12 @@ def prepare_data(df):
         "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
     )]
     df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
+    df.rename(columns={"phaticity ratio": "Phaticity Ratio", "adherence_to_guide": "Adherence to Guide"}, inplace=True)
 
     selection = True
     if selection:
         features = [
-            "phaticity ratio",
+            "Phaticity Ratio",
             "Analytic",
             "Clout",
             "Authentic",
@@ -152,19 +169,23 @@ def prepare_data(df):
             "Personal experience",
             "Cognition",
             "Responsivity",
-            "adherence_to_guide"
+            "Social"
+            #"Adherence to Guide"
         ]
     else:
         features = df.columns.difference(["Unnamed: 0", "conversation_id", "speaker_name"])
     # rename phaticity ratio to Phaticity Ratio
     # Plot a correlation matrix using matplotlib (optional)
+
     correlation_matrix = df[features].corr()
-    plt.figure(figsize=(12, 6))
-    plt.title("Correlation Matrix")
+    # rename phaticity ratio to Phaticity Ratio and adherence_toguide to Adherence to Guide
+    plt.figure(figsize=(20, 10))
+    plt.title("Correlation Matrix", fontsize=20)
     plt.imshow(correlation_matrix, cmap="coolwarm", interpolation="nearest")
-    plt.colorbar()
-    plt.xticks(range(len(features)), features, rotation=45)
-    plt.yticks(range(len(features)), features)
+    cbar = plt.colorbar()
+    cbar.ax.tick_params(labelsize=15)
+    plt.xticks(range(len(features)), features, rotation=45, fontsize=15)
+    plt.yticks(range(len(features)), features, fontsize=15)
     plt.tight_layout()
     plt.show()
 
@@ -338,7 +359,7 @@ def plot_pca_scores(pc_df):
 # Main Script Execution
 # -----------------------------
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_big.csv"
     print("Loading data")
     df = load_data(input_path)
     
@@ -364,5 +385,5 @@ if __name__ == "__main__":
     collection_ids = pd.read_csv(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure.csv")
     df = df.merge(collection_ids[['conversation_id', 'collection_id']], on="conversation_id")
     # Save the clustered data
-    output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_clustered.csv"
+    output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_clustered.csv"
     df.to_csv(output_path, index=False)

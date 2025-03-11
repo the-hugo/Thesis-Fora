@@ -71,6 +71,10 @@ if __name__ == "__main__":
     input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\output_filled_phatic_ratio_conversation_speaker_phatic_ratio.pkl"
     print("Loading data")
     df = load_data(input_path)
+    # please give me max and min duration and mean duration
+    print(f"Max duration: {df['duration'].max()}")
+    print(f"Min duration: {df['duration'].min()}")
+    print(f"Mean duration: {df['duration'].mean()}")
     print("Data loaded")
     
     # Group by conversation_id and calculate the mean of the ratios and speaker_count
