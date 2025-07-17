@@ -18,7 +18,7 @@ def load_data(input_path):
 
 
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_big.csv"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
     print("Loading data")
     responsivity = load_data(
         r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\total_responsivity_matrix.pkl"
@@ -53,5 +53,5 @@ if __name__ == "__main__":
     print(len(all_features))
     print(all_features.columns)
     all_features.to_csv(
-        r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_big.csv"
+        r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
     )

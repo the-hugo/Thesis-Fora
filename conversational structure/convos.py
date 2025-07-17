@@ -133,7 +133,7 @@ def prepare_data(df):
     multi_fac_turns = is_fac_turns[is_fac_turns["conversation_id"].isin(multi_fac_conversations)]
 
     # Identify conversations where all facilitators have SpeakerTurn below the threshold
-    threshold = 7
+    threshold = 3
     short_multi_fac_conversations = (
         multi_fac_turns.groupby("conversation_id")["SpeakerTurn"]
         .max()
@@ -171,15 +171,6 @@ def prepare_data(df):
                 (df["speaker_name"] == row["speaker_name"]),
                 "is_fac"
             ] = False
-
-    df["speaker_name"] = df["speaker_name"].str.lower().str.strip()
-    df["speaker_name"] = df["speaker_name"].str.replace(r"\[.*\]", "", regex=True)
-    df = df[
-        ~df["speaker_name"].str.contains(
-            "^speaker|moderator|audio|computer|computer voice|facilitator|group|highlight|interpreter|interviewer|multiple voices|other speaker|participant|redacted|speaker X|unknown|video"
-        )
-    ]
-    df["speaker_name"] = df["speaker_name"].apply(lambda x: re.sub(r"^\s+|\s+$", "", x))
     return df
 
 

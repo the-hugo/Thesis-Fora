@@ -41,15 +41,16 @@ for idx, row in df.iterrows():
                 'personal_story_ratio': row['personal_story_ratio'],
                 'personal_experience_ratio': row['personal_experience_ratio'],
                 'Gc': row['Gc'],
-                'Gd': row['Gd']
+                'Gd': row['Gd'],
+                "Number of Turns": row['num_turns'],
+                "conversation duration": row['conversation_length'],
+                "num_speakers": row['num_speakers']
             })
 df_melted = pd.DataFrame(rows)
 log("Melted DataFrame created with columns: " + ", ".join(df_melted.columns))
 
 # --- Calculate Average Metrics per Role ---
-avg_metrics = df_melted.groupby('role')[['turn_taking_equity', 'personal_sharing_ratio', 
-                                           'personal_story_ratio', 'personal_experience_ratio',
-                                           'Gc', 'Gd']].mean()
+avg_metrics = df_melted.groupby('role')[["Number of Turns", "conversation duration", 'num_speakers']].mean()
 log("\nAverage Metrics per Role:")
 log(str(avg_metrics))
 

@@ -52,6 +52,7 @@ class GlobalEmbeddingVisualizer:
         )
         initial_count = len(self.df)
         self.df = self.df.dropna(subset=["Latent_Attention_Embedding"])
+        self.df = self.df[(self.df["Personal story"] == 1)]
         dropped_count = initial_count - len(self.df)
         print(
             f"Dropped {dropped_count} rows due to NaN values in 'Latent-Attention_Embedding'"
@@ -204,125 +205,120 @@ class GlobalEmbeddingVisualizer:
                 self.speaker_embeddings, conversation_info, on=group_columns
             )
 
-    def plot_aggregated(self):
-        self.compute_aggregated_embeddings()
-    
-        # Compute UMAP embedding and add columns.
-        embedding_2d = self.compute_umap(self.speaker_embeddings)
-        self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
-        self.speaker_embeddings["UMAP_2"] = embedding_2d[:, 1]
-        self.speaker_embeddings["UMAP_3"] = embedding_2d[:, 2]
+        def plot_aggregated(self):
+            self.compute_aggregated_embeddings()
+        
+            # Compute UMAP embedding and add columns.
+            embedding_2d = self.compute_umap(self.speaker_embeddings)
+            self.speaker_embeddings["UMAP_1"] = embedding_2d[:, 0]
+            self.speaker_embeddings["UMAP_2"] = embedding_2d[:, 1]
+            self.speaker_embeddings["UMAP_3"] = embedding_2d[:, 2]
 
-        if self.aggregate_embeddings:
-            level = "Collection" if self.aggregate_on_collection else "Conversation"
-        else:
-            level = "SpeakerTurn"
-
-        hover_data = {
-            **self.convo_info,
-            "UMAP_1": False,
-            "UMAP_2": False,
-            "UMAP_3": False,
-        }
-
-        if self.color_by_role == "f_p":
-            self.speaker_embeddings["symbol"] = self.speaker_embeddings["is_fac"].apply(
-                lambda x: "Facilitator" if x else "Participant"
-            )
-            color_column = "symbol"
-            custom_color_palette = ["#ffc600", "#00a4eb"]
-            legend_title = "Role"
-            symbol_sequence = ["diamond", "circle"]
-        else:
-            color_column = "collection_title"
-            custom_color_palette = self.custom_color_palette
-            legend_title = "Collection"
-            symbol_sequence = None
-
-        df_sorted = self.speaker_embeddings.sort_values(by=["symbol", "collection_title"])
-        neighbors = self.umap_params["n_neighbors"]
-        neighbors_str = str(neighbors)
-
-        if hasattr(self, "plot_mode") and self.plot_mode == "2D":
-            fig = px.scatter(
-                df_sorted,
-                x="UMAP_1",
-                y="UMAP_2",
-                color=color_column,
-                symbol="symbol" if symbol_sequence else None,
-                hover_name="speaker_name",
-                hover_data=hover_data,
-                color_discrete_sequence=custom_color_palette,
-            )
-            fig.update_layout(
-                xaxis=dict(visible=False, showgrid=False, zeroline=False),
-                yaxis=dict(visible=False, showgrid=False, zeroline=False),
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                title="",
-                margin=dict(l=0, r=0, t=0, b=0),
-                showlegend=False,
-            )
-            fig.update_traces(marker=dict(size=8))
-        else:
-            title = "Aggregated Turn Embeddings on Conversational Level"
-            if symbol_sequence:
-                fig = px.scatter_3d(
-                    df_sorted,
-                    x="UMAP_1",
-                    y="UMAP_2",
-                    z="UMAP_3",
-                    color=color_column,
-                    symbol="symbol",
-                    symbol_sequence=symbol_sequence,
-                    title=title,
-                    hover_name="speaker_name",
-                    hover_data=hover_data,
-                    color_discrete_sequence=custom_color_palette,
-                )
+            if self.aggregate_embeddings:
+                level = "Collection" if self.aggregate_on_collection else "Conversation"
             else:
-                fig = px.scatter_3d(
+                level = "SpeakerTurn"
+
+            hover_data = {
+                **self.convo_info,
+                "UMAP_1": False,
+                "UMAP_2": False,
+                "UMAP_3": False,
+            }
+
+            if self.color_by_role == "f_p":
+                self.speaker_embeddings["symbol"] = self.speaker_embeddings["is_fac"].apply(
+                    lambda x: "Facilitator" if x else "Participant"
+                )
+                color_column = "symbol"
+                custom_color_palette = ["#ffc600", "#00a4eb"]
+                legend_title = "Role"
+                symbol_sequence = ["diamond", "circle"]
+
+            df_sorted = self.speaker_embeddings.sort_values(by=["symbol", "collection_title"])
+            neighbors = self.umap_params["n_neighbors"]
+            neighbors_str = str(neighbors)
+
+            if hasattr(self, "plot_mode") and self.plot_mode == "2D":
+                fig = px.scatter(
                     df_sorted,
                     x="UMAP_1",
                     y="UMAP_2",
-                    z="UMAP_3",
                     color=color_column,
-                    symbol="symbol",
-                    title=title,
+                    symbol="symbol" if symbol_sequence else None,
                     hover_name="speaker_name",
                     hover_data=hover_data,
                     color_discrete_sequence=custom_color_palette,
                 )
-
-            fig.update_traces(
-                marker=dict(
-                    size=self.plot_marker_size,
-                    line=dict(width=self.plot_marker_line_width, color="black"),
-                )
-            )
-            fig.update_layout(
-                scene=dict(
+                fig.update_layout(
                     xaxis=dict(visible=False, showgrid=False, zeroline=False),
                     yaxis=dict(visible=False, showgrid=False, zeroline=False),
-                    zaxis=dict(visible=False, showgrid=False, zeroline=False)
-                ),
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                title="",
-                margin=dict(l=0, r=0, t=0, b=0),
-                showlegend=False,
-            )
-            fig.update_traces(marker=dict(size=8))
-            fig.update_layout(
-                legend_title_text=legend_title, legend=dict(itemsizing="constant")
-            )
-            fig.update_layout(
-                font=dict(size=20),
-                autosize=False,
-                width=3000,
-                height=2000,
-                margin=dict(t=30, b=30)
-            )
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    title="",
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    showlegend=False,
+                )
+                fig.update_traces(marker=dict(size=8))
+            else:
+                title = "Aggregated Turn Embeddings on Conversational Level"
+                if symbol_sequence:
+                    fig = px.scatter_3d(
+                        df_sorted,
+                        x="UMAP_1",
+                        y="UMAP_2",
+                        z="UMAP_3",
+                        color=color_column,
+                        symbol="symbol",
+                        symbol_sequence=symbol_sequence,
+                        title=title,
+                        hover_name="speaker_name",
+                        hover_data=hover_data,
+                        color_discrete_sequence=custom_color_palette,
+                    )
+                else:
+                    fig = px.scatter_3d(
+                        df_sorted,
+                        x="UMAP_1",
+                        y="UMAP_2",
+                        z="UMAP_3",
+                        color=color_column,
+                        symbol="symbol",
+                        title=title,
+                        hover_name="speaker_name",
+                        hover_data=hover_data,
+                        color_discrete_sequence=custom_color_palette,
+                    )
+
+                fig.update_traces(
+                    marker=dict(
+                        size=self.plot_marker_size,
+                        line=dict(width=self.plot_marker_line_width, color="black"),
+                    )
+                )
+                fig.update_layout(
+                    scene=dict(
+                        xaxis=dict(visible=False, showgrid=False, zeroline=False),
+                        yaxis=dict(visible=False, showgrid=False, zeroline=False),
+                        zaxis=dict(visible=False, showgrid=False, zeroline=False)
+                    ),
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    title="",
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    showlegend=False,
+                )
+                fig.update_traces(marker=dict(size=8))
+                fig.update_layout(
+                    legend_title_text=legend_title, legend=dict(itemsizing="constant")
+                )
+                fig.update_layout(
+                    font=dict(size=20),
+                    autosize=False,
+                    width=3000,
+                    height=2000,
+                    margin=dict(t=30, b=30)
+                )
         final_output_path = (
             self.output_path_template
             + "umap_embeddings"

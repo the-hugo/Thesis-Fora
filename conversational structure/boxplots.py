@@ -102,9 +102,7 @@ def plot_box(variable_name, title, xlabel):
 plot_box('personal_sharing_ratio', "Personal Sharing Ratio by Role", "Personal Sharing (per turn)")
 # plot_box('personal_experience_ratio', "Personal Experience Ratio by Role", "Personal Experience (per turn)")
 plot_box('turn_taking_equity', "Turn Taking Equity by Role", "Turn Taking Equity")
-# You can also create box plots for Gc and Gd, e.g.:
-# plot_box('Gc', "Gc by Role Group", "Gc")
-# plot_box('Gd', "Gd by Role Group", "Gd")
+
 
 def plot_violin(variable_name, title, xlabel):
     fig = px.violin(

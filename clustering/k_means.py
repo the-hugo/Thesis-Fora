@@ -75,9 +75,11 @@ def apply_umap(combined_features):
     # Preserve 'conversation_id' and 'speaker_name' columns
     preserved_columns = combined_features[["conversation_id", "speaker_name"]].reset_index(drop=True)
     combined_features = combined_features.drop(columns=["conversation_id", "speaker_name"]).reset_index(drop=True)
-
+    # drop the cluster column if it exists
+    # if "cluster" in combined_features.columns:
+    #     combined_features = combined_features.drop(columns=["cluster"])
     scaled_X = StandardScaler().fit_transform(combined_features)
-
+    
     # Set the number of UMAP components
     n_components = 2
     reducer = umap.UMAP(n_components=n_components, random_state=42)
@@ -95,20 +97,20 @@ def apply_umap(combined_features):
 def plot_clusters(df):
     # Print the number of rows and convert clusters to string for discrete coloring
     print(len(df))
-    df["cluster"] = df["cluster"].astype(str)
+    # df["cluster"] = df["cluster"].astype(str)
     
     # Create the scatter plot using Plotly Express
     fig = px.scatter(
         df,
         x="umap_0",
         y="umap_1",
-        color="cluster",
+        # color="cluster",
         hover_name="speaker_name",
         title="Facilitator Clustering",
         labels={
             "umap_0": "UMAP Dimension 1",
             "umap_1": "UMAP Dimension 2",
-            "cluster": "Cluster"
+            # "cluster": "Cluster"
         },
         color_discrete_sequence=px.colors.qualitative.Plotly
     )
@@ -129,7 +131,8 @@ def plot_clusters(df):
         #title={'text': "P Clustering", 'x': 0.5},
     )
     
-    fig.write_html("scatter_plot.html")
+    #fig.write_html("scatter_plot.html")
+    fig.show()
 
 
 def k_means(df, n_clusters):
@@ -169,8 +172,10 @@ def prepare_data(df):
             "Personal experience",
             "Cognition",
             "Responsivity",
-            "Social"
-            #"Adherence to Guide"
+            #"Social",
+            "Adherence to Guide",
+            # "Invitations to Participate",
+            # "Validation Strategies"
         ]
     else:
         features = df.columns.difference(["Unnamed: 0", "conversation_id", "speaker_name"])
@@ -352,16 +357,44 @@ def plot_pca_scores(pc_df):
         labels={"PC1": "Principal Component 1", "PC2": "Principal Component 2", "cluster": "Cluster"},
         color_discrete_sequence=px.colors.qualitative.Plotly
     )
-    fig.show()
+    #fig.show()
 
 
 # -----------------------------
 # Main Script Execution
 # -----------------------------
 if __name__ == "__main__":
-    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_big.csv"
+    input_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_big.csv"
     print("Loading data")
     df = load_data(input_path)
+    # df = df.drop(columns=[
+    #     "Personal experience",
+    #     "Personal story",
+    # ])
+    # # load C:\Users\paul-\Documents\Coding\facilitated-dialogue\data\annotated_data.pkl
+    # df_2 = pd.read_pickle(r"C:\Users\paul-\Documents\Coding\facilitated-dialogue\data\annotated_data.pkl")
+    # df_2 = df_2[df_2["is_fac"] == True]
+    # df_2["Validation Strategies"] = df_2["Express appreciation"] + df_2["Express affirmation"]
+    # df_2["Invitations to Participate"] = df_2["Open invitation"] + df_2["Specific invitation"]
+    
+    # df_2 = df_2.groupby(["conversation_id", "speaker_name"], as_index=False).agg({
+    #     "Invitations to Participate": "sum",
+    #     "Validation Strategies": "sum",
+    #     "Personal story": "sum",
+    #     "Personal experience": "sum"
+    # })
+    # cols_to_merge = [
+    #     "conversation_id",
+    #     "speaker_name",
+    #     "Personal experience",
+    #     "Personal story",
+    #     "Validation Strategies",
+    #     "Invitations to Participate"
+    # ]
+    # df_2_subset = df_2[cols_to_merge]
+    # df = df.merge(df_2_subset, on=["conversation_id", "speaker_name"], how="left")
+    
+
     
     print("Applying UMAP to all features")
     df = preprocessing(df)
@@ -385,5 +418,5 @@ if __name__ == "__main__":
     collection_ids = pd.read_csv(r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\conversational_structure.csv")
     df = df.merge(collection_ids[['conversation_id', 'collection_id']], on="conversation_id")
     # Save the clustered data
-    output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\participants_features_clustered.csv"
+    output_path = r"C:\Users\paul-\Documents\Uni\Management and Digital Technologies\Thesis Fora\Code\data\output\annotated\facilitators_features_clustered.csv"
     df.to_csv(output_path, index=False)
